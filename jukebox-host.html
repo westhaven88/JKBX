@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JKBX — Host</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --black: #0a0a0a;
+    --deep: #111116;
+    --panel: #18181f;
+    --border: #2a2a35;
+    --amber: #f5a623;
+    --amber-dim: #c07d10;
+    --green: #1DB954;
+    --red: #e84040;
+    --text: #e8e8f0;
+    --muted: #6b6b80;
+    --card: #1e1e28;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--black);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Noise texture overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.4;
+  }
+
+  /* Glowing top bar */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 40px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(10,10,10,0.95);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(12px);
+  }
+
+  .logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2rem;
+    letter-spacing: 0.15em;
+    color: var(--amber);
+    text-shadow: 0 0 30px rgba(245,166,35,0.4);
+  }
+
+  .logo span { color: var(--text); }
+
+  .badge {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 6px 14px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+
+  /* Screens */
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  /* ── LOGIN SCREEN ── */
+  #loginScreen {
+    min-height: calc(100vh - 73px);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    text-align: center;
+    position: relative;
+  }
+  #loginScreen.active { display: flex; }
+
+  .vinyl-bg {
+    position: absolute;
+    width: 600px;
+    height: 600px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #1a1a22 30%, #111116 50%, #0d0d12 70%);
+    border: 1px solid var(--border);
+    opacity: 0.5;
+    animation: spin 40s linear infinite;
+    box-shadow: 0 0 80px rgba(245,166,35,0.06);
+  }
+
+  .vinyl-bg::after {
+    content: '';
+    position: absolute;
+    inset: 15%;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    box-shadow: inset 0 0 30px rgba(0,0,0,0.5);
+  }
+
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+  .login-content { position: relative; z-index: 1; }
+
+  .login-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(3rem, 10vw, 7rem);
+    letter-spacing: 0.1em;
+    line-height: 0.9;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+
+  .login-title .highlight { color: var(--amber); text-shadow: 0 0 40px rgba(245,166,35,0.5); }
+
+  .login-subtitle {
+    font-size: 1rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 48px;
+    font-weight: 300;
+  }
+
+  .btn-spotify {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--green);
+    color: #000;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 500;
+    font-size: 0.95rem;
+    padding: 14px 32px;
+    border-radius: 50px;
+    border: none;
+    cursor: pointer;
+    text-decoration: none;
+    letter-spacing: 0.03em;
+    transition: all 0.2s ease;
+    box-shadow: 0 0 30px rgba(29,185,84,0.3);
+  }
+
+  .btn-spotify:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 50px rgba(29,185,84,0.5);
+    background: #22d960;
+  }
+
+  .spotify-icon { width: 22px; height: 22px; }
+
+  .setup-note {
+    margin-top: 40px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px 28px;
+    max-width: 480px;
+    text-align: left;
+  }
+
+  .setup-note h3 {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--amber);
+    margin-bottom: 12px;
+  }
+
+  .setup-note p {
+    font-size: 0.82rem;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  .setup-note code {
+    background: var(--deep);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+    color: var(--amber);
+  }
+
+  /* ── DASHBOARD SCREEN ── */
+  #dashScreen {
+    min-height: calc(100vh - 73px);
+    display: none;
+    padding: 40px;
+    gap: 32px;
+  }
+  #dashScreen.active { display: grid; grid-template-columns: 1fr 380px; }
+
+  /* Queue Panel */
+  .queue-panel h2 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.6rem;
+    letter-spacing: 0.1em;
+    color: var(--amber);
+    margin-bottom: 6px;
+  }
+
+  .queue-meta {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 24px;
+  }
+
+  .queue-list { display: flex; flex-direction: column; gap: 8px; }
+
+  .queue-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 18px;
+    transition: border-color 0.2s;
+    animation: slideIn 0.3s ease;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(-16px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .queue-item:hover { border-color: var(--amber-dim); }
+  .queue-item.now-playing { border-color: var(--green); background: rgba(29,185,84,0.05); }
+
+  .track-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--muted);
+    min-width: 24px;
+  }
+
+  .now-playing .track-num { color: var(--green); }
+
+  .track-art {
+    width: 44px;
+    height: 44px;
+    border-radius: 4px;
+    background: var(--deep);
+    object-fit: cover;
+    flex-shrink: 0;
+  }
+
+  .track-info { flex: 1; min-width: 0; }
+
+  .track-name {
+    font-size: 0.9rem;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 2px;
+  }
+
+  .track-artist {
+    font-size: 0.78rem;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .track-submitter {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--amber-dim);
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
+  }
+
+  .remove-btn {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 4px;
+    transition: color 0.2s;
+    flex-shrink: 0;
+  }
+  .remove-btn:hover { color: var(--red); }
+
+  .empty-queue {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.8rem;
+    letter-spacing: 0.05em;
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+  }
+
+  /* Right sidebar */
+  .sidebar { display: flex; flex-direction: column; gap: 20px; }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+  }
+
+  .panel-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+
+  /* Now Playing */
+  .now-playing-art {
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 6px;
+    background: var(--deep);
+    object-fit: cover;
+    margin-bottom: 14px;
+    display: block;
+  }
+
+  .np-title {
+    font-size: 1rem;
+    font-weight: 500;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .np-artist {
+    font-size: 0.82rem;
+    color: var(--muted);
+    margin-bottom: 16px;
+  }
+
+  .progress-bar {
+    width: 100%;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: var(--green);
+    border-radius: 2px;
+    transition: width 1s linear;
+    width: 0%;
+  }
+
+  .controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+  }
+
+  .ctrl-btn {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 1.2rem;
+    padding: 8px;
+    transition: color 0.2s, transform 0.1s;
+    line-height: 1;
+  }
+
+  .ctrl-btn:hover { color: var(--text); transform: scale(1.1); }
+  .ctrl-btn.primary { color: var(--text); font-size: 1.6rem; }
+  .ctrl-btn.primary:hover { color: var(--amber); }
+
+  /* Party Code */
+  .party-code-display {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 3.5rem;
+    letter-spacing: 0.2em;
+    color: var(--amber);
+    text-align: center;
+    text-shadow: 0 0 20px rgba(245,166,35,0.3);
+    margin: 8px 0;
+  }
+
+  .party-link {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--muted);
+    text-align: center;
+    word-break: break-all;
+    margin-top: 8px;
+  }
+
+  .copy-btn {
+    width: 100%;
+    margin-top: 12px;
+    background: var(--deep);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.06em;
+    padding: 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+  }
+
+  .copy-btn:hover { border-color: var(--amber); color: var(--amber); }
+  .copy-btn.copied { color: var(--green); border-color: var(--green); }
+
+  /* Stats */
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .stat {
+    background: var(--deep);
+    border-radius: 5px;
+    padding: 12px;
+    text-align: center;
+  }
+
+  .stat-val {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.8rem;
+    color: var(--amber);
+    line-height: 1;
+  }
+
+  .stat-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.62rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-top: 4px;
+  }
+
+  /* Playback toggle */
+  .playback-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--muted);
+  }
+
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    flex-shrink: 0;
+  }
+
+  .dot.live {
+    background: var(--green);
+    box-shadow: 0 0 8px rgba(29,185,84,0.6);
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* Config modal */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    backdrop-filter: blur(6px);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .modal {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 32px;
+    max-width: 500px;
+    width: 100%;
+  }
+
+  .modal h2 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.8rem;
+    letter-spacing: 0.1em;
+    color: var(--amber);
+    margin-bottom: 6px;
+  }
+
+  .modal p {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-bottom: 24px;
+    line-height: 1.6;
+  }
+
+  .form-group { margin-bottom: 16px; }
+
+  .form-group label {
+    display: block;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+
+  .form-group input {
+    width: 100%;
+    background: var(--deep);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.85rem;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .form-group input:focus { border-color: var(--amber); }
+
+  .btn-primary {
+    width: 100%;
+    background: var(--amber);
+    border: none;
+    color: #000;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 600;
+    font-size: 0.9rem;
+    padding: 12px;
+    border-radius: 5px;
+    cursor: pointer;
+    letter-spacing: 0.03em;
+    transition: all 0.2s;
+  }
+
+  .btn-primary:hover { background: #f7b93a; transform: translateY(-1px); }
+
+  .btn-secondary {
+    width: 100%;
+    margin-top: 8px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.85rem;
+    padding: 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-secondary:hover { border-color: var(--text); color: var(--text); }
+
+  .help-link {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--amber);
+    text-decoration: none;
+    display: block;
+    text-align: center;
+    margin-top: 16px;
+  }
+
+  .help-link:hover { text-decoration: underline; }
+
+  /* QR placeholder */
+  .qr-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--deep);
+    border-radius: 6px;
+    padding: 16px;
+    margin-top: 12px;
+  }
+
+  .qr-placeholder {
+    width: 120px;
+    height: 120px;
+    background: var(--border);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--muted);
+    text-align: center;
+    line-height: 1.5;
+  }
+
+  @media (max-width: 900px) {
+    #dashScreen.active { grid-template-columns: 1fr; }
+    .topbar { padding: 16px 20px; }
+    #dashScreen { padding: 20px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="logo">JK<span>BX</span></div>
+  <div id="topStatus" class="badge">HOST PANEL</div>
+</div>
+
+<!-- CONFIG MODAL -->
+<div class="modal-overlay" id="configModal">
+  <div class="modal">
+    <h2>Setup Your App</h2>
+    <p>To connect Spotify, you need a free Spotify Developer app. This takes about 2 minutes to set up.</p>
+
+    <div class="form-group">
+      <label>Spotify Client ID</label>
+      <input type="text" id="clientIdInput" placeholder="e.g. a1b2c3d4e5f6...">
+    </div>
+
+    <div class="form-group">
+      <label>Your Party Name (shown to guests)</label>
+      <input type="text" id="partyNameInput" placeholder="e.g. Alex's Birthday Bash">
+    </div>
+
+    <button class="btn-primary" onclick="saveConfig()">Connect to Spotify →</button>
+    <button class="btn-secondary" onclick="useDemoMode()">Use Demo Mode (no Spotify)</button>
+
+    <a class="help-link" href="https://developer.spotify.com/dashboard" target="_blank">→ Create a Spotify Developer App</a>
+
+    <div style="margin-top:20px; background:var(--deep); border-radius:6px; padding:16px;">
+      <p style="font-family:'DM Mono',monospace; font-size:0.68rem; color:var(--muted); line-height:1.8; margin:0;">
+        In your Spotify Developer Dashboard:<br>
+        1. Create a new app<br>
+        2. Add redirect URI: <code style="color:var(--amber);">this page's URL</code><br>
+        3. Copy the Client ID above
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- LOGIN SCREEN -->
+<div id="loginScreen" class="screen">
+  <div class="vinyl-bg"></div>
+  <div class="login-content">
+    <div class="login-title"><span class="highlight">JKBX</span><br>JUKEBOX</div>
+    <div class="login-subtitle">Party music — controlled by the crowd</div>
+    <button class="btn-spotify" onclick="startSpotifyAuth()">
+      <svg class="spotify-icon" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+      </svg>
+      Connect with Spotify
+    </button>
+    <div style="margin-top:16px; font-family:'DM Mono',monospace; font-size:0.72rem; color:var(--muted); letter-spacing:0.05em;">
+      Requires Spotify Premium · Host only
+    </div>
+  </div>
+</div>
+
+<!-- DASHBOARD SCREEN -->
+<div id="dashScreen" class="screen">
+
+  <!-- Queue (left) -->
+  <div class="queue-panel">
+    <h2>QUEUE</h2>
+    <div class="queue-meta" id="queueMeta">0 songs — share your code to get started</div>
+    <div class="queue-list" id="queueList">
+      <div class="empty-queue">NO SONGS IN QUEUE<br><br>Share your party code with guests<br>and songs will appear here</div>
+    </div>
+  </div>
+
+  <!-- Sidebar (right) -->
+  <div class="sidebar">
+
+    <!-- Now Playing -->
+    <div class="panel">
+      <div class="panel-label">Now Playing</div>
+      <img id="npArt" class="now-playing-art" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3Crect fill='%2318181f'/%3E%3C/svg%3E" alt="album art">
+      <div class="np-title" id="npTitle">—</div>
+      <div class="np-artist" id="npArtist">No track playing</div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="controls">
+        <button class="ctrl-btn" onclick="spotifyPrev()" title="Previous">⏮</button>
+        <button class="ctrl-btn primary" id="playPauseBtn" onclick="togglePlay()">▶</button>
+        <button class="ctrl-btn" onclick="spotifyNext()" title="Next">⏭</button>
+      </div>
+      <div class="playback-status" style="margin-top:14px;">
+        <div class="dot" id="statusDot"></div>
+        <span id="statusText">Not connected</span>
+      </div>
+    </div>
+
+    <!-- Party Code -->
+    <div class="panel">
+      <div class="panel-label">Party Code</div>
+      <div class="party-code-display" id="partyCodeDisplay">——</div>
+      <div class="party-link" id="guestLink">—</div>
+      <div class="qr-area">
+        <div class="qr-placeholder" id="qrCode">QR code appears<br>after connecting</div>
+      </div>
+      <button class="copy-btn" id="copyBtn" onclick="copyLink()">Copy Guest Link</button>
+    </div>
+
+    <!-- Stats -->
+    <div class="panel">
+      <div class="panel-label">Party Stats</div>
+      <div class="stats-grid">
+        <div class="stat">
+          <div class="stat-val" id="statSongs">0</div>
+          <div class="stat-label">Songs</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val" id="statGuests">0</div>
+          <div class="stat-label">Guests</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val" id="statPlayed">0</div>
+          <div class="stat-label">Played</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val" id="statTime">0m</div>
+          <div class="stat-label">Queue</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── CONFIG & STATE ──────────────────────────────────────────────────
+const REDIRECT_URI = window.location.href.split('?')[0].split('#')[0];
+const SCOPES = [
+  'user-read-playback-state',
+  'user-modify-playback-state',
+  'user-read-currently-playing',
+  'playlist-modify-public',
+  'playlist-modify-private'
+].join(' ');
+
+let config = { clientId: '', partyName: 'Party', demoMode: false };
+let state = {
+  accessToken: null,
+  queue: [],
+  partyCode: '',
+  guestLink: '',
+  isPlaying: false,
+  currentTrack: null,
+  playedCount: 0,
+  guestCount: new Set(),
+  progressInterval: null,
+  pollInterval: null
+};
+
+// ── INIT ────────────────────────────────────────────────────────────
+window.onload = () => {
+  loadConfig();
+
+  // Handle Spotify OAuth callback
+  const hash = window.location.hash;
+  const params = new URLSearchParams(hash.replace('#', '?'));
+  const token = params.get('access_token');
+
+  if (token) {
+    state.accessToken = token;
+    history.replaceState(null, '', window.location.pathname);
+    showDashboard();
+    startPolling();
+    return;
+  }
+
+  // Check for saved state
+  const saved = localStorage.getItem('jkbx_queue');
+  if (saved) {
+    try { state.queue = JSON.parse(saved); } catch(e) {}
+  }
+
+  const savedCode = localStorage.getItem('jkbx_code');
+  if (savedCode) state.partyCode = savedCode;
+
+  if (config.clientId || config.demoMode) {
+    showScreen('loginScreen');
+  } else {
+    document.getElementById('configModal').style.display = 'flex';
+  }
+};
+
+function loadConfig() {
+  const saved = localStorage.getItem('jkbx_config');
+  if (saved) {
+    try {
+      config = { ...config, ...JSON.parse(saved) };
+    } catch(e) {}
+  }
+}
+
+function saveConfig() {
+  const clientId = document.getElementById('clientIdInput').value.trim();
+  const partyName = document.getElementById('partyNameInput').value.trim() || 'Party';
+
+  if (!clientId) {
+    alert('Please enter your Spotify Client ID');
+    return;
+  }
+
+  config = { clientId, partyName, demoMode: false };
+  localStorage.setItem('jkbx_config', JSON.stringify(config));
+  document.getElementById('configModal').style.display = 'none';
+  showScreen('loginScreen');
+}
+
+function useDemoMode() {
+  const partyName = document.getElementById('partyNameInput').value.trim() || 'Demo Party';
+  config = { clientId: '', partyName, demoMode: true };
+  localStorage.setItem('jkbx_config', JSON.stringify(config));
+  document.getElementById('configModal').style.display = 'none';
+  showDashboard();
+  loadDemoData();
+}
+
+// ── AUTH ────────────────────────────────────────────────────────────
+function startSpotifyAuth() {
+  if (config.demoMode) { showDashboard(); loadDemoData(); return; }
+  if (!config.clientId) { document.getElementById('configModal').style.display = 'flex'; return; }
+
+  const authUrl = new URL('https://accounts.spotify.com/authorize');
+  authUrl.searchParams.set('client_id', config.clientId);
+  authUrl.searchParams.set('response_type', 'token');
+  authUrl.searchParams.set('redirect_uri', REDIRECT_URI);
+  authUrl.searchParams.set('scope', SCOPES);
+  authUrl.searchParams.set('show_dialog', 'false');
+  window.location.href = authUrl.toString();
+}
+
+// ── SCREENS ─────────────────────────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const el = document.getElementById(id);
+  if (el) el.classList.add('active');
+}
+
+function showDashboard() {
+  showScreen('dashScreen');
+  setupPartyCode();
+  renderQueue();
+  updateStats();
+  document.getElementById('topStatus').textContent = config.partyName.toUpperCase();
+}
+
+// ── PARTY CODE ───────────────────────────────────────────────────────
+function setupPartyCode() {
+  if (!state.partyCode) {
+    state.partyCode = generateCode();
+    localStorage.setItem('jkbx_code', state.partyCode);
+  }
+
+  const guestUrl = window.location.href.replace('jukebox-host.html', 'jukebox-guest.html');
+  state.guestLink = `${guestUrl}?code=${state.partyCode}&party=${encodeURIComponent(config.partyName)}`;
+
+  document.getElementById('partyCodeDisplay').textContent = state.partyCode;
+  document.getElementById('guestLink').textContent = state.guestLink;
+
+  // Generate simple QR using a free API
+  const qrEl = document.getElementById('qrCode');
+  qrEl.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(state.guestLink)}&bgcolor=111116&color=f5a623&margin=6" style="border-radius:4px;" width="120" height="120" alt="QR Code">`;
+}
+
+function generateCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  return Array.from({length: 6}, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
+
+function copyLink() {
+  navigator.clipboard.writeText(state.guestLink).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = '✓ Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'Copy Guest Link';
+      btn.classList.remove('copied');
+    }, 2000);
+  });
+}
+
+// ── QUEUE ────────────────────────────────────────────────────────────
+function renderQueue() {
+  const list = document.getElementById('queueList');
+  const meta = document.getElementById('queueMeta');
+
+  if (state.queue.length === 0) {
+    list.innerHTML = `<div class="empty-queue">NO SONGS IN QUEUE<br><br>Share your party code with guests<br>and songs will appear here</div>`;
+    meta.textContent = '0 songs — share your code to get started';
+    return;
+  }
+
+  meta.textContent = `${state.queue.length} song${state.queue.length !== 1 ? 's' : ''} in queue`;
+
+  list.innerHTML = state.queue.map((track, i) => `
+    <div class="queue-item ${i === 0 ? 'now-playing' : ''}" id="qi-${track.id}">
+      <span class="track-num">${i === 0 ? '▶' : String(i + 1).padStart(2, '0')}</span>
+      <img class="track-art" src="${track.albumArt || ''}" alt="">
+      <div class="track-info">
+        <div class="track-name">${escHtml(track.name)}</div>
+        <div class="track-artist">${escHtml(track.artist)}</div>
+      </div>
+      <span class="track-submitter">${escHtml(track.submitter || '')}</span>
+      <button class="remove-btn" onclick="removeTrack('${track.id}')" title="Remove">✕</button>
+    </div>
+  `).join('');
+
+  updateStats();
+  saveQueue();
+}
+
+function removeTrack(id) {
+  state.queue = state.queue.filter(t => t.id !== id);
+  renderQueue();
+}
+
+function saveQueue() {
+  localStorage.setItem('jkbx_queue', JSON.stringify(state.queue));
+}
+
+function updateStats() {
+  document.getElementById('statSongs').textContent = state.queue.length;
+  document.getElementById('statGuests').textContent = state.guestCount.size;
+  document.getElementById('statPlayed').textContent = state.playedCount;
+  const totalMs = state.queue.reduce((s, t) => s + (t.duration || 210000), 0);
+  const mins = Math.round(totalMs / 60000);
+  document.getElementById('statTime').textContent = mins > 0 ? `${mins}m` : '0m';
+}
+
+// ── SPOTIFY API ──────────────────────────────────────────────────────
+async function spotifyFetch(endpoint, method = 'GET', body = null) {
+  if (!state.accessToken) return null;
+  try {
+    const opts = {
+      method,
+      headers: {
+        'Authorization': `Bearer ${state.accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    };
+    if (body) opts.body = JSON.stringify(body);
+    const res = await fetch(`https://api.spotify.com/v1${endpoint}`, opts);
+    if (res.status === 204) return {};
+    if (!res.ok) return null;
+    return await res.json();
+  } catch(e) { return null; }
+}
+
+async function addToSpotifyQueue(uri) {
+  if (!state.accessToken) return;
+  await spotifyFetch(`/me/player/queue?uri=${encodeURIComponent(uri)}`, 'POST');
+}
+
+async function togglePlay() {
+  const data = await spotifyFetch('/me/player');
+  if (!data) return;
+  if (data.is_playing) {
+    await spotifyFetch('/me/player/pause', 'PUT');
+  } else {
+    await spotifyFetch('/me/player/play', 'PUT');
+  }
+  setTimeout(pollPlayback, 500);
+}
+
+async function spotifyNext() {
+  await spotifyFetch('/me/player/next', 'POST');
+  state.playedCount++;
+  if (state.queue.length > 0) {
+    state.queue.shift();
+    renderQueue();
+  }
+  setTimeout(pollPlayback, 500);
+}
+
+async function spotifyPrev() {
+  await spotifyFetch('/me/player/previous', 'POST');
+  setTimeout(pollPlayback, 500);
+}
+
+async function pollPlayback() {
+  if (!state.accessToken) return;
+  const data = await spotifyFetch('/me/player');
+  if (!data || !data.item) return;
+
+  const track = data.item;
+  state.isPlaying = data.is_playing;
+  state.currentTrack = track;
+
+  document.getElementById('npTitle').textContent = track.name;
+  document.getElementById('npArtist').textContent = track.artists.map(a => a.name).join(', ');
+  document.getElementById('playPauseBtn').textContent = state.isPlaying ? '⏸' : '▶';
+
+  const art = track.album?.images?.[0]?.url;
+  if (art) document.getElementById('npArt').src = art;
+
+  const pct = data.progress_ms / track.duration_ms * 100;
+  document.getElementById('progressFill').style.width = pct + '%';
+
+  const dot = document.getElementById('statusDot');
+  const statusText = document.getElementById('statusText');
+  if (state.isPlaying) {
+    dot.classList.add('live');
+    statusText.textContent = 'Live · Spotify Premium';
+  } else {
+    dot.classList.remove('live');
+    statusText.textContent = 'Paused';
+  }
+}
+
+function startPolling() {
+  pollPlayback();
+  state.pollInterval = setInterval(pollPlayback, 3000);
+
+  // Poll for new guest submissions (via localStorage shared with guest page in same browser, or real backend)
+  setInterval(checkGuestSubmissions, 2000);
+}
+
+function checkGuestSubmissions() {
+  const pending = localStorage.getItem('jkbx_pending_' + state.partyCode);
+  if (!pending) return;
+  try {
+    const tracks = JSON.parse(pending);
+    tracks.forEach(track => {
+      if (!state.queue.find(t => t.id === track.id)) {
+        state.queue.push(track);
+        if (track.submitter) state.guestCount.add(track.submitter);
+        // Add to Spotify queue
+        if (track.uri && state.accessToken) addToSpotifyQueue(track.uri);
+      }
+    });
+    renderQueue();
+  } catch(e) {}
+}
+
+// ── DEMO MODE ────────────────────────────────────────────────────────
+function loadDemoData() {
+  state.queue = [
+    { id: 'd1', name: 'Blinding Lights', artist: 'The Weeknd', albumArt: 'https://i.scdn.co/image/ab67616d0000b2738863bc11d2aa12b54f5aeb36', submitter: 'Alex', duration: 200040 },
+    { id: 'd2', name: 'As It Was', artist: 'Harry Styles', albumArt: 'https://i.scdn.co/image/ab67616d0000b273b46f74097655d7f353caab14', submitter: 'Jordan', duration: 167303 },
+    { id: 'd3', name: 'Levitating', artist: 'Dua Lipa', albumArt: 'https://i.scdn.co/image/ab67616d0000b27350a3147b4edd7701a876c6ce', submitter: 'Sam', duration: 203806 },
+    { id: 'd4', name: 'Stay', artist: 'The Kid LAROI, Justin Bieber', albumArt: 'https://i.scdn.co/image/ab67616d0000b2734f6f0085b80f17f3c8e0bc4a', submitter: 'Taylor', duration: 141000 },
+  ];
+  state.guestCount = new Set(['Alex', 'Jordan', 'Sam', 'Taylor']);
+  state.playedCount = 3;
+
+  document.getElementById('npTitle').textContent = 'Blinding Lights';
+  document.getElementById('npArtist').textContent = 'The Weeknd';
+  document.getElementById('npArt').src = 'https://i.scdn.co/image/ab67616d0000b2738863bc11d2aa12b54f5aeb36';
+  document.getElementById('progressFill').style.width = '42%';
+  document.getElementById('playPauseBtn').textContent = '⏸';
+  document.getElementById('statusDot').classList.add('live');
+  document.getElementById('statusText').textContent = 'Demo Mode';
+
+  renderQueue();
+  setInterval(checkGuestSubmissions, 2000);
+}
+
+// ── UTILS ────────────────────────────────────────────────────────────
+function escHtml(str) {
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
