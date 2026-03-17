@@ -806,17 +806,33 @@ window.onload = async () => {
 
   // ── Case 1: Spotify sent us back with an auth code
   if (code) {
-    // Immediately wipe the URL so a refresh doesn't re-trigger this
+    // Wipe the URL immediately so refresh doesn't re-trigger
     history.replaceState(null, '', window.location.pathname);
     showLoadingOverlay('Connecting to Spotify...');
     const ok = await exchangeCodeForToken(code);
     hideLoadingOverlay();
     if (ok) {
+      loadSavedState();
       showDashboard();
       startPolling();
     } else {
-      alert('Spotify connection failed. Please try again.');
-      showScreen('loginScreen');
+      // Show a permanent error screen — do NOT redirect anywhere
+      document.body.innerHTML = `
+        <div style="min-height:100vh;background:#0a0a0a;display:flex;align-items:center;justify-content:center;font-family:monospace;padding:40px;">
+          <div style="max-width:600px;width:100%;">
+            <div style="font-size:2rem;color:#f5a623;font-weight:bold;margin-bottom:16px;">JKBX AUTH ERROR</div>
+            <div style="color:#e84040;margin-bottom:24px;font-size:0.9rem;">Token exchange failed. See details below:</div>
+            <div id="errorDetails" style="background:#111;border:1px solid #2a2a35;border-radius:6px;padding:20px;color:#e8e8f0;font-size:0.8rem;line-height:1.8;word-break:break-all;">
+              ${window._jkbxLastError || 'No error details captured'}
+            </div>
+            <div style="margin-top:24px;color:#6b6b80;font-size:0.75rem;">
+              Screenshot this page and share it to get help debugging.
+            </div>
+            <button onclick="location.href=location.pathname" style="margin-top:16px;background:#f5a623;border:none;color:#000;padding:12px 24px;border-radius:4px;cursor:pointer;font-family:monospace;font-weight:bold;">
+              Try Again
+            </button>
+          </div>
+        </div>`;
     }
     return;
   }
@@ -1297,7 +1313,17 @@ exchangeCodeForToken = async function(code) {
     const data = await res.json();
     dbLog('HTTP status: ' + res.status, res.ok ? '#1DB954' : '#e84040');
     if (data.error) {
-      dbLog('ERROR: ' + data.error + ' — ' + (data.error_description || ''), '#e84040');
+      const errMsg = 'ERROR: ' + data.error + ' — ' + (data.error_description || '');
+      dbLog(errMsg, '#e84040');
+      window._jkbxLastError = [
+        'Spotify error: ' + data.error,
+        'Description: ' + (data.error_description || 'none'),
+        'HTTP status: ' + res.status,
+        'redirect_uri used: ' + REDIRECT_URI,
+        'client_id used: ' + clientId,
+        'verifier present: ' + !!verifier,
+        'code length: ' + code.length
+      ].join('\n');
     }
     if (data.access_token) {
       dbLog('Token received! Saving...', '#1DB954');
@@ -1316,6 +1342,15 @@ exchangeCodeForToken = async function(code) {
       return true;
     }
     dbLog('No access_token in response', '#e84040');
+    if (!window._jkbxLastError) {
+      window._jkbxLastError = [
+        'No access_token in response',
+        'HTTP status: ' + res.status,
+        'Full response: ' + JSON.stringify(data),
+        'redirect_uri used: ' + REDIRECT_URI,
+        'client_id used: ' + clientId,
+      ].join('\n');
+    }
     return false;
   } catch(e) {
     dbLog('FETCH ERROR: ' + e.message, '#e84040');
