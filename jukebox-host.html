@@ -804,10 +804,17 @@ window.onload = async () => {
   const code = urlParams.get('code');
 
   if (code) {
+    // Config is already loaded via loadConfig() above
     history.replaceState(null, '', window.location.pathname);
     const ok = await exchangeCodeForToken(code);
-    if (ok) { loadSavedState(); showDashboard(); startPolling(); }
-    else { alert('Spotify login failed — please try again.'); showScreen('loginScreen'); }
+    if (ok) {
+      loadSavedState();
+      showDashboard();
+      startPolling();
+    } else {
+      // Token exchange failed — show login so user can retry
+      showScreen('loginScreen');
+    }
     return;
   }
 
@@ -827,6 +834,7 @@ window.onload = async () => {
   if (config.clientId || config.demoMode) {
     showScreen('loginScreen');
   } else {
+    // Pre-fill modal if any values saved
     document.getElementById('configModal').style.display = 'flex';
   }
 };
@@ -843,6 +851,11 @@ function loadConfig() {
   if (saved) {
     try {
       config = { ...config, ...JSON.parse(saved) };
+      // Pre-fill modal inputs with saved values
+      const ciEl = document.getElementById('clientIdInput');
+      const pnEl = document.getElementById('partyNameInput');
+      if (ciEl && config.clientId) ciEl.value = config.clientId;
+      if (pnEl && config.partyName && config.partyName !== 'Party') pnEl.value = config.partyName;
     } catch(e) {}
   }
 }
@@ -859,7 +872,8 @@ function saveConfig() {
   config = { clientId, partyName, demoMode: false };
   localStorage.setItem('jkbx_config', JSON.stringify(config));
   document.getElementById('configModal').style.display = 'none';
-  showScreen('loginScreen');
+  // Go straight to Spotify auth — no extra step needed
+  startSpotifyAuth();
 }
 
 function useDemoMode() {
