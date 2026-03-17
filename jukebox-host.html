@@ -796,30 +796,33 @@ let state = {
 };
 
 // ── INIT ────────────────────────────────────────────────────────────
-window.onload = () => {
+window.onload = async () => {
   loadConfig();
 
-  // Handle Spotify OAuth callback
-  const hash = window.location.hash;
-  const params = new URLSearchParams(hash.replace('#', '?'));
-  const token = params.get('access_token');
+  // Handle Spotify OAuth PKCE callback (?code=...)
+  const urlParams = new URLSearchParams(window.location.search);
+  const code = urlParams.get('code');
 
-  if (token) {
-    state.accessToken = token;
+  if (code) {
     history.replaceState(null, '', window.location.pathname);
+    const ok = await exchangeCodeForToken(code);
+    if (ok) { loadSavedState(); showDashboard(); startPolling(); }
+    else { alert('Spotify login failed — please try again.'); showScreen('loginScreen'); }
+    return;
+  }
+
+  // Restore saved token if not expired
+  const savedToken = localStorage.getItem('jkbx_token');
+  const expiry = parseInt(localStorage.getItem('jkbx_token_expiry') || '0');
+  if (savedToken && Date.now() < expiry) {
+    state.accessToken = savedToken;
+    loadSavedState();
     showDashboard();
     startPolling();
     return;
   }
 
-  // Check for saved state
-  const saved = localStorage.getItem('jkbx_queue');
-  if (saved) {
-    try { state.queue = JSON.parse(saved); } catch(e) {}
-  }
-
-  const savedCode = localStorage.getItem('jkbx_code');
-  if (savedCode) state.partyCode = savedCode;
+  loadSavedState();
 
   if (config.clientId || config.demoMode) {
     showScreen('loginScreen');
@@ -827,6 +830,13 @@ window.onload = () => {
     document.getElementById('configModal').style.display = 'flex';
   }
 };
+
+function loadSavedState() {
+  const saved = localStorage.getItem('jkbx_queue');
+  if (saved) { try { state.queue = JSON.parse(saved); } catch(e) {} }
+  const savedCode = localStorage.getItem('jkbx_code');
+  if (savedCode) state.partyCode = savedCode;
+}
 
 function loadConfig() {
   const saved = localStorage.getItem('jkbx_config');
@@ -861,18 +871,66 @@ function useDemoMode() {
   loadDemoData();
 }
 
-// ── AUTH ────────────────────────────────────────────────────────────
-function startSpotifyAuth() {
+// ── AUTH (PKCE flow) ─────────────────────────────────────────────────
+async function startSpotifyAuth() {
   if (config.demoMode) { showDashboard(); loadDemoData(); return; }
   if (!config.clientId) { document.getElementById('configModal').style.display = 'flex'; return; }
 
+  const verifier = generateVerifier(128);
+  const challenge = await generateChallenge(verifier);
+  localStorage.setItem('jkbx_verifier', verifier);
+
   const authUrl = new URL('https://accounts.spotify.com/authorize');
   authUrl.searchParams.set('client_id', config.clientId);
-  authUrl.searchParams.set('response_type', 'token');
+  authUrl.searchParams.set('response_type', 'code');
   authUrl.searchParams.set('redirect_uri', REDIRECT_URI);
   authUrl.searchParams.set('scope', SCOPES);
-  authUrl.searchParams.set('show_dialog', 'false');
+  authUrl.searchParams.set('code_challenge_method', 'S256');
+  authUrl.searchParams.set('code_challenge', challenge);
   window.location.href = authUrl.toString();
+}
+
+function generateVerifier(length) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+  const arr = new Uint8Array(length);
+  crypto.getRandomValues(arr);
+  return Array.from(arr).map(b => chars[b % chars.length]).join('');
+}
+
+async function generateChallenge(verifier) {
+  const data = new TextEncoder().encode(verifier);
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  return btoa(String.fromCharCode(...new Uint8Array(digest)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+async function exchangeCodeForToken(code) {
+  const verifier = localStorage.getItem('jkbx_verifier');
+  const body = new URLSearchParams({
+    grant_type: 'authorization_code',
+    code,
+    redirect_uri: REDIRECT_URI,
+    client_id: config.clientId,
+    code_verifier: verifier
+  });
+
+  const res = await fetch('https://accounts.spotify.com/api/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString()
+  });
+
+  const data = await res.json();
+  if (data.access_token) {
+    state.accessToken = data.access_token;
+    // Store refresh token and expiry
+    localStorage.setItem('jkbx_token', data.access_token);
+    localStorage.setItem('jkbx_refresh', data.refresh_token || '');
+    localStorage.setItem('jkbx_token_expiry', Date.now() + (data.expires_in * 1000));
+    localStorage.removeItem('jkbx_verifier');
+    return true;
+  }
+  return false;
 }
 
 // ── SCREENS ─────────────────────────────────────────────────────────
