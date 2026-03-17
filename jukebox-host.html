@@ -798,43 +798,50 @@ let state = {
 // ── INIT ────────────────────────────────────────────────────────────
 window.onload = async () => {
   loadConfig();
+  loadSavedState();
 
-  // Handle Spotify OAuth PKCE callback (?code=...)
   const urlParams = new URLSearchParams(window.location.search);
   const code = urlParams.get('code');
+  const error = urlParams.get('error');
 
+  // ── Case 1: Spotify sent us back with an auth code
   if (code) {
-    // Config is already loaded via loadConfig() above
+    // Immediately wipe the URL so a refresh doesn't re-trigger this
     history.replaceState(null, '', window.location.pathname);
+    showLoadingOverlay('Connecting to Spotify...');
     const ok = await exchangeCodeForToken(code);
+    hideLoadingOverlay();
     if (ok) {
-      loadSavedState();
       showDashboard();
       startPolling();
     } else {
-      // Token exchange failed — show login so user can retry
+      alert('Spotify connection failed. Please try again.');
       showScreen('loginScreen');
     }
     return;
   }
 
-  // Restore saved token if not expired
+  // ── Case 2: Spotify returned an error
+  if (error) {
+    history.replaceState(null, '', window.location.pathname);
+    showScreen('loginScreen');
+    return;
+  }
+
+  // ── Case 3: We have a valid saved token
   const savedToken = localStorage.getItem('jkbx_token');
   const expiry = parseInt(localStorage.getItem('jkbx_token_expiry') || '0');
-  if (savedToken && Date.now() < expiry) {
+  if (savedToken && Date.now() < expiry - 60000) {
     state.accessToken = savedToken;
-    loadSavedState();
     showDashboard();
     startPolling();
     return;
   }
 
-  loadSavedState();
-
+  // ── Case 4: No token, show login or setup
   if (config.clientId || config.demoMode) {
     showScreen('loginScreen');
   } else {
-    // Pre-fill modal if any values saved
     document.getElementById('configModal').style.display = 'flex';
   }
 };
@@ -844,6 +851,22 @@ function loadSavedState() {
   if (saved) { try { state.queue = JSON.parse(saved); } catch(e) {} }
   const savedCode = localStorage.getItem('jkbx_code');
   if (savedCode) state.partyCode = savedCode;
+}
+
+function showLoadingOverlay(msg) {
+  let el = document.getElementById('loadingOverlay');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'loadingOverlay';
+    el.style.cssText = 'position:fixed;inset:0;background:rgba(10,10,10,0.95);display:flex;align-items:center;justify-content:center;z-index:9000;flex-direction:column;gap:16px;';
+    el.innerHTML = '<div style="width:32px;height:32px;border:3px solid #2a2a35;border-top-color:#f5a623;border-radius:50%;animation:rotate 0.8s linear infinite;"></div><div style="font-family:DM Mono,monospace;font-size:0.8rem;color:#6b6b80;letter-spacing:0.08em;">' + msg + '</div>';
+    document.body.appendChild(el);
+  }
+}
+
+function hideLoadingOverlay() {
+  const el = document.getElementById('loadingOverlay');
+  if (el) el.remove();
 }
 
 function loadConfig() {
@@ -920,6 +943,15 @@ async function generateChallenge(verifier) {
 
 async function exchangeCodeForToken(code) {
   const verifier = localStorage.getItem('jkbx_verifier');
+  if (!verifier) {
+    console.error('JKBX: No PKCE verifier found in localStorage');
+    return false;
+  }
+  if (!config.clientId) {
+    console.error('JKBX: No client ID in config');
+    return false;
+  }
+
   const body = new URLSearchParams({
     grant_type: 'authorization_code',
     code,
@@ -928,23 +960,29 @@ async function exchangeCodeForToken(code) {
     code_verifier: verifier
   });
 
-  const res = await fetch('https://accounts.spotify.com/api/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: body.toString()
-  });
+  try {
+    const res = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString()
+    });
 
-  const data = await res.json();
-  if (data.access_token) {
-    state.accessToken = data.access_token;
-    // Store refresh token and expiry
-    localStorage.setItem('jkbx_token', data.access_token);
-    localStorage.setItem('jkbx_refresh', data.refresh_token || '');
-    localStorage.setItem('jkbx_token_expiry', Date.now() + (data.expires_in * 1000));
-    localStorage.removeItem('jkbx_verifier');
-    return true;
+    const data = await res.json();
+    console.log('JKBX token response:', data.access_token ? 'OK' : data.error);
+
+    if (data.access_token) {
+      state.accessToken = data.access_token;
+      localStorage.setItem('jkbx_token', data.access_token);
+      localStorage.setItem('jkbx_refresh', data.refresh_token || '');
+      localStorage.setItem('jkbx_token_expiry', String(Date.now() + (data.expires_in * 1000)));
+      localStorage.removeItem('jkbx_verifier');
+      return true;
+    }
+    return false;
+  } catch(e) {
+    console.error('JKBX token exchange error:', e);
+    return false;
   }
-  return false;
 }
 
 // ── SCREENS ─────────────────────────────────────────────────────────
