@@ -1225,5 +1225,62 @@ function escHtml(str) {
   return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 </script>
+
+<!-- DEBUG PANEL -->
+<div id="debugPanel" style="position:fixed;bottom:0;left:0;right:0;background:#0a0a0a;border-top:2px solid #f5a623;padding:12px 16px;font-family:monospace;font-size:11px;color:#f5a623;z-index:99999;max-height:160px;overflow-y:auto;">
+  <div style="color:#6b6b80;margin-bottom:4px;">JKBX DEBUG — <span id="dbTime"></span></div>
+  <div id="dbLog"></div>
+</div>
+<style> body { padding-bottom: 170px; } </style>
+<script>
+function dbLog(msg, color) {
+  const el = document.getElementById('dbLog');
+  const line = document.createElement('div');
+  line.style.color = color || '#e8e8f0';
+  line.style.marginBottom = '2px';
+  line.textContent = '› ' + msg;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+  document.getElementById('dbTime').textContent = new Date().toLocaleTimeString();
+}
+
+// Patch key functions to log
+const _origOnload = window.onload;
+window.onload = async function() {
+  dbLog('Page loaded');
+  dbLog('URL params: ' + window.location.search, '#aaa');
+  dbLog('localStorage keys: jkbx_token=' + (localStorage.getItem('jkbx_token') ? 'YES' : 'NO')
+    + ', verifier=' + (localStorage.getItem('jkbx_verifier') ? 'YES' : 'NO')
+    + ', config=' + (localStorage.getItem('jkbx_config') ? 'YES' : 'NO'), '#aaa');
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const code = urlParams.get('code');
+  if (code) {
+    dbLog('Spotify code received: ' + code.substring(0,12) + '...', '#1DB954');
+  }
+
+  await _origOnload.call(this);
+  dbLog('Init complete. Active screen: ' + (document.querySelector('.screen.active')?.id || 'none'), '#f5a623');
+};
+
+const _origExchange = exchangeCodeForToken;
+exchangeCodeForToken = async function(code) {
+  dbLog('Exchanging token...', '#f5a623');
+  const verifier = sessionStorage.getItem('jkbx_verifier') || localStorage.getItem('jkbx_verifier');
+  const clientId = sessionStorage.getItem('jkbx_auth_client_id') || (typeof config !== 'undefined' ? config.clientId : '');
+  dbLog('verifier: ' + (verifier ? verifier.substring(0,8)+'...' : 'MISSING'), verifier ? '#aaa' : '#e84040');
+  dbLog('clientId: ' + (clientId ? clientId.substring(0,8)+'...' : 'MISSING'), clientId ? '#aaa' : '#e84040');
+  const result = await _origExchange.call(this, code);
+  dbLog('Token exchange result: ' + (result ? 'SUCCESS' : 'FAILED'), result ? '#1DB954' : '#e84040');
+  return result;
+};
+
+const _origStartAuth = startSpotifyAuth;
+startSpotifyAuth = async function() {
+  dbLog('Starting Spotify auth...', '#f5a623');
+  dbLog('config.clientId: ' + (config.clientId ? config.clientId.substring(0,8)+'...' : 'MISSING'), config.clientId ? '#aaa' : '#e84040');
+  await _origStartAuth.call(this);
+};
+</script>
 </body>
 </html>
