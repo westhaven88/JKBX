@@ -1278,9 +1278,49 @@ exchangeCodeForToken = async function(code) {
   const clientId = sessionStorage.getItem('jkbx_auth_client_id') || (typeof config !== 'undefined' ? config.clientId : '');
   dbLog('verifier: ' + (verifier ? verifier.substring(0,8)+'...' : 'MISSING'), verifier ? '#aaa' : '#e84040');
   dbLog('clientId: ' + (clientId ? clientId.substring(0,8)+'...' : 'MISSING'), clientId ? '#aaa' : '#e84040');
-  const result = await _origExchange.call(this, code);
-  dbLog('Token exchange result: ' + (result ? 'SUCCESS' : 'FAILED'), result ? '#1DB954' : '#e84040');
-  return result;
+  dbLog('redirect_uri: ' + REDIRECT_URI, '#aaa');
+
+  // Do the fetch directly here so we can log the raw response
+  try {
+    const body = new URLSearchParams({
+      grant_type: 'authorization_code',
+      code: code,
+      redirect_uri: REDIRECT_URI,
+      client_id: clientId,
+      code_verifier: verifier
+    });
+    const res = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString()
+    });
+    const data = await res.json();
+    dbLog('HTTP status: ' + res.status, res.ok ? '#1DB954' : '#e84040');
+    if (data.error) {
+      dbLog('ERROR: ' + data.error + ' — ' + (data.error_description || ''), '#e84040');
+    }
+    if (data.access_token) {
+      dbLog('Token received! Saving...', '#1DB954');
+      state.accessToken = data.access_token;
+      localStorage.setItem('jkbx_token', data.access_token);
+      localStorage.setItem('jkbx_token_expiry', String(Date.now() + 3600000));
+      sessionStorage.removeItem('jkbx_verifier');
+      sessionStorage.removeItem('jkbx_auth_client_id');
+      localStorage.removeItem('jkbx_verifier');
+      dbLog('Saved! Loading dashboard...', '#1DB954');
+      // Small delay so we can read the logs
+      await new Promise(r => setTimeout(r, 2000));
+      loadSavedState();
+      showDashboard();
+      startPolling();
+      return true;
+    }
+    dbLog('No access_token in response', '#e84040');
+    return false;
+  } catch(e) {
+    dbLog('FETCH ERROR: ' + e.message, '#e84040');
+    return false;
+  }
 };
 
 const _origStartAuth = startSpotifyAuth;
