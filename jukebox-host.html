@@ -909,13 +909,21 @@ function useDemoMode() {
 }
 
 // ── AUTH (PKCE flow) ─────────────────────────────────────────────────
+
+// Store verifier in sessionStorage (survives redirect, cleared on tab close)
+// AND localStorage as backup
 async function startSpotifyAuth() {
   if (config.demoMode) { showDashboard(); loadDemoData(); return; }
   if (!config.clientId) { document.getElementById('configModal').style.display = 'flex'; return; }
 
-  const verifier = generateVerifier(128);
+  const verifier = generateVerifier(64);
   const challenge = await generateChallenge(verifier);
+
+  // Save verifier in BOTH storages for reliability
+  sessionStorage.setItem('jkbx_verifier', verifier);
   localStorage.setItem('jkbx_verifier', verifier);
+  // Also save the client ID separately so it survives any config reload issues
+  sessionStorage.setItem('jkbx_auth_client_id', config.clientId);
 
   const authUrl = new URL('https://accounts.spotify.com/authorize');
   authUrl.searchParams.set('client_id', config.clientId);
@@ -928,7 +936,7 @@ async function startSpotifyAuth() {
 }
 
 function generateVerifier(length) {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   const arr = new Uint8Array(length);
   crypto.getRandomValues(arr);
   return Array.from(arr).map(b => chars[b % chars.length]).join('');
@@ -942,21 +950,19 @@ async function generateChallenge(verifier) {
 }
 
 async function exchangeCodeForToken(code) {
-  const verifier = localStorage.getItem('jkbx_verifier');
-  if (!verifier) {
-    console.error('JKBX: No PKCE verifier found in localStorage');
-    return false;
-  }
-  if (!config.clientId) {
-    console.error('JKBX: No client ID in config');
-    return false;
-  }
+  // Try sessionStorage first, then localStorage as fallback
+  const verifier = sessionStorage.getItem('jkbx_verifier') || localStorage.getItem('jkbx_verifier');
+  // Use saved client ID from session, fall back to config
+  const clientId = sessionStorage.getItem('jkbx_auth_client_id') || config.clientId;
+
+  if (!verifier) { console.error('JKBX: verifier missing'); return false; }
+  if (!clientId) { console.error('JKBX: clientId missing'); return false; }
 
   const body = new URLSearchParams({
     grant_type: 'authorization_code',
-    code,
+    code: code,
     redirect_uri: REDIRECT_URI,
-    client_id: config.clientId,
+    client_id: clientId,
     code_verifier: verifier
   });
 
@@ -966,21 +972,24 @@ async function exchangeCodeForToken(code) {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: body.toString()
     });
-
     const data = await res.json();
-    console.log('JKBX token response:', data.access_token ? 'OK' : data.error);
 
     if (data.access_token) {
       state.accessToken = data.access_token;
+      // Persist token
       localStorage.setItem('jkbx_token', data.access_token);
-      localStorage.setItem('jkbx_refresh', data.refresh_token || '');
-      localStorage.setItem('jkbx_token_expiry', String(Date.now() + (data.expires_in * 1000)));
+      localStorage.setItem('jkbx_token_expiry', String(Date.now() + ((data.expires_in || 3600) * 1000)));
+      if (data.refresh_token) localStorage.setItem('jkbx_refresh', data.refresh_token);
+      // Clean up verifier
+      sessionStorage.removeItem('jkbx_verifier');
+      sessionStorage.removeItem('jkbx_auth_client_id');
       localStorage.removeItem('jkbx_verifier');
       return true;
     }
+    console.error('JKBX token error:', JSON.stringify(data));
     return false;
   } catch(e) {
-    console.error('JKBX token exchange error:', e);
+    console.error('JKBX fetch error:', e);
     return false;
   }
 }
