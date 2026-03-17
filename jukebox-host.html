@@ -772,7 +772,7 @@
 
 <script>
 // ── CONFIG & STATE ──────────────────────────────────────────────────
-const REDIRECT_URI = window.location.href.split('?')[0].split('#')[0];
+const REDIRECT_URI = window.location.origin + window.location.pathname;
 const SCOPES = [
   'user-read-playback-state',
   'user-modify-playback-state',
@@ -1040,7 +1040,8 @@ function setupPartyCode() {
     localStorage.setItem('jkbx_code', state.partyCode);
   }
 
-  const guestUrl = window.location.href.replace('jukebox-host.html', 'jukebox-guest.html');
+  const cleanBase = window.location.origin + window.location.pathname;
+  const guestUrl = cleanBase.replace('jukebox-host.html', 'jukebox-guest.html');
   state.guestLink = `${guestUrl}?code=${state.partyCode}&party=${encodeURIComponent(config.partyName)}`;
 
   document.getElementById('partyCodeDisplay').textContent = state.partyCode;
