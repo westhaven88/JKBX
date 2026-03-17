@@ -830,9 +830,15 @@ window.onload = async () => {
 
   // ── Case 3: We have a valid saved token
   const savedToken = localStorage.getItem('jkbx_token');
-  const expiry = parseInt(localStorage.getItem('jkbx_token_expiry') || '0');
-  if (savedToken && Date.now() < expiry - 60000) {
+  const expiryStr = localStorage.getItem('jkbx_token_expiry');
+  const expiry = expiryStr ? Number(expiryStr) : 0;
+  const now = Date.now();
+  // Accept token if expiry is not set (0) OR if not yet expired
+  // Being generous: treat missing expiry as valid
+  const tokenValid = savedToken && (expiry === 0 || now < expiry);
+  if (tokenValid) {
     state.accessToken = savedToken;
+    loadSavedState();
     showDashboard();
     startPolling();
     return;
@@ -978,7 +984,9 @@ async function exchangeCodeForToken(code) {
       state.accessToken = data.access_token;
       // Persist token
       localStorage.setItem('jkbx_token', data.access_token);
-      localStorage.setItem('jkbx_token_expiry', String(Date.now() + ((data.expires_in || 3600) * 1000)));
+      const expiryTime = Date.now() + ((data.expires_in || 3600) * 1000);
+      localStorage.setItem('jkbx_token_expiry', String(expiryTime));
+      console.log('JKBX: token saved, expires at', new Date(expiryTime).toISOString());
       if (data.refresh_token) localStorage.setItem('jkbx_refresh', data.refresh_token);
       // Clean up verifier
       sessionStorage.removeItem('jkbx_verifier');
