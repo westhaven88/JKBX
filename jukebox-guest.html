@@ -565,7 +565,8 @@ let guestState = {
   partyName: '',
   submitted: [],
   searchDebounce: null,
-  clientId: ''
+  clientId: '',
+  spotifyToken: ''
 };
 
 // ── INIT ─────────────────────────────────────────────────────────────
@@ -581,6 +582,14 @@ window.onload = () => {
       const cfg = JSON.parse(savedConfig);
       guestState.clientId = cfg.clientId || '';
     } catch(e) {}
+  }
+
+  // Get Spotify token — from URL param (shared by host) or local storage (same device)
+  const tokenParam = params.get('t');
+  if (tokenParam && tokenParam.length > 20) {
+    guestState.spotifyToken = tokenParam;
+  } else {
+    guestState.spotifyToken = localStorage.getItem('jkbx_token') || '';
   }
 
   // Load saved name
@@ -662,10 +671,10 @@ function showHint() {
 async function searchSpotify(query) {
   showLoading();
 
-  // Get the host's Spotify token from localStorage (shared same browser origin)
-  const spotifyToken = localStorage.getItem('jkbx_token');
+  // Use token from URL param (other devices) or localStorage (same device)
+  const spotifyToken = guestState.spotifyToken || localStorage.getItem('jkbx_token') || '';
 
-  if (spotifyToken) {
+  if (spotifyToken && spotifyToken.length > 20) {
     await searchViaSpotify(query, spotifyToken);
   } else {
     await searchViaLastFm(query);
@@ -711,36 +720,42 @@ async function searchViaSpotify(query, token) {
 }
 
 async function searchViaLastFm(query) {
-  // Last.fm API — free, no auth needed, CORS-friendly
+  // MusicBrainz API — truly open, no key, good CORS support
   try {
-    const API_KEY = 'a0ed8d8e7909fe97e8a8e9b925e81c1d';
-    const url = `https://ws.audioscrobbler.com/2.0/?method=track.search&track=${encodeURIComponent(query)}&api_key=${API_KEY}&format=json&limit=8`;
-    const res = await fetch(url);
+    const url = `https://musicbrainz.org/ws/2/recording/?query=recording:${encodeURIComponent(query)}&limit=8&fmt=json`;
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'JKBX-Party-App/1.0 (https://westhaven88.github.io/JKBX)' }
+    });
     const data = await res.json();
-    const matches = data?.results?.trackmatches?.track || [];
+    const recordings = data?.recordings || [];
 
-    if (!matches.length) {
+    if (!recordings.length) {
       document.getElementById('searchResults').innerHTML =
         `<div class="hint">No results found — try a different search</div>`;
       return;
     }
 
-    const tracks = matches.map((t, i) => ({
-      id: 'lfm-' + i + '-' + t.name.replace(/\s/g,''),
-      name: t.name,
-      artist: t.artist,
-      album: '',
-      duration_ms: 210000,
-      albumArt: (t.image?.find(img => img.size === 'medium') || t.image?.[1] || {})['#text'] || '',
-      uri: null
-    }));
+    const tracks = recordings.slice(0, 8).map((r, i) => {
+      const artist = r['artist-credit']?.[0]?.artist?.name || r['artist-credit']?.[0]?.name || 'Unknown';
+      const release = r.releases?.[0];
+      const album = release?.title || '';
+      return {
+        id: r.id || ('mb-' + i),
+        name: r.title,
+        artist: artist,
+        album: album,
+        duration_ms: r.length || 210000,
+        albumArt: '',
+        uri: null
+      };
+    });
 
     renderResults(tracks, true);
   } catch(e) {
     document.getElementById('searchResults').innerHTML = `
       <div class="hint" style="color:var(--red);">
         <span class="hint-icon">⚠️</span>
-        Couldn't search right now.<br>Check your connection and try again.
+        Search unavailable.<br>Ask the host to open the party page first,<br>then try again.
       </div>`;
   }
 }
