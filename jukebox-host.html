@@ -1373,19 +1373,17 @@ function setupPartyCode() {
   const cleanBase = window.location.origin + window.location.pathname;
   const guestUrl = cleanBase.replace('jukebox-host.html', 'jukebox-guest.html');
   const tok = state.accessToken || localStorage.getItem('jkbx_token') || '';
-  // Short link for QR code — no token so it stays scannable
-  state.guestLinkShort = `${guestUrl}?code=${state.partyCode}&party=${encodeURIComponent(config.partyName)}`;
-  // Full link with token for copy/share/SMS/email
-  state.guestLink = tok
-    ? `${guestUrl}?code=${state.partyCode}&party=${encodeURIComponent(config.partyName)}&t=${tok}`
-    : state.guestLinkShort;
+
+  // Include token in all links - QR uses larger size to stay scannable
+  state.guestLinkShort = `${guestUrl}?code=${state.partyCode}&party=${encodeURIComponent(config.partyName)}&t=${tok}`;
+  state.guestLink = state.guestLinkShort;
 
   document.getElementById('partyCodeDisplay').textContent = state.partyCode;
   document.getElementById('guestLink').textContent = state.guestLink;
 
   // Generate simple QR using a free API
   const qrEl = document.getElementById('qrCode');
-  qrEl.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(state.guestLink)}&bgcolor=111116&color=f5a623&margin=6" style="border-radius:4px;" width="120" height="120" alt="QR Code">`;
+  qrEl.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=240x240&ecc=L&data=${encodeURIComponent(state.guestLink)}&bgcolor=111116&color=f5a623&margin=6" style="border-radius:4px;" width="120" height="120" alt="QR Code">`;
 }
 
 function generateCode() {
@@ -1601,7 +1599,7 @@ function shareParty() {
   const qrEl = document.getElementById('shareQR');
   const shortLink = state.guestLinkShort || link;
   if (shortLink) {
-    qrEl.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(shortLink)}&bgcolor=111116&color=f5a623&margin=6" style="border-radius:6px;" width="140" height="140" alt="QR">`;
+    qrEl.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=240x240&ecc=L&data=${encodeURIComponent(shortLink)}&bgcolor=111116&color=f5a623&margin=6" style="border-radius:6px;" width="140" height="140" alt="QR">`;
   }
 
   modal.classList.add('visible');
