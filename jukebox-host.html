@@ -203,10 +203,22 @@
   #dashScreen {
     min-height: calc(100vh - 73px);
     display: none;
-    padding: 40px;
-    gap: 32px;
+    padding: 24px 32px;
+    gap: 20px;
+    flex-direction: column;
   }
-  #dashScreen.active { display: grid; grid-template-columns: 1fr 380px; }
+  #dashScreen.active { display: flex; }
+
+  .dash-top {
+    display: grid;
+    grid-template-columns: 340px 1fr 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+
+  .dash-bottom {
+    flex: 1;
+  }
 
   /* Queue Panel */
   .queue-panel h2 {
@@ -885,9 +897,14 @@
   .share-close-btn:hover { border-color: var(--text); color: var(--text); }
 
   @media (max-width: 900px) {
-    #dashScreen.active { grid-template-columns: 1fr; }
+    .dash-top { grid-template-columns: 1fr; }
     .topbar { padding: 16px 20px; }
-    #dashScreen { padding: 20px; }
+    #dashScreen { padding: 16px; }
+  }
+  @media (max-width: 600px) {
+    .dash-top { grid-template-columns: 1fr; }
+    #dashScreen { padding: 12px; gap: 12px; }
+    .party-code-display { font-size: 2.8rem; }
   }
 
   /* Share button */
@@ -999,44 +1016,10 @@
 <!-- DASHBOARD SCREEN -->
 <div id="dashScreen" class="screen">
 
-  <!-- Queue (left) -->
-  <div class="queue-panel">
-    <h2>QUEUE</h2>
-    <div class="queue-meta" id="queueMeta">0 songs — share your code to get started</div>
-    <div class="queue-list" id="queueList">
-      <div class="empty-queue">
-        <div style="font-size:0.85rem; margin-bottom:20px;">NO SONGS IN QUEUE</div>
-        <button class="share-big-btn" onclick="shareParty()">
-          <span style="font-size:1.4rem;">🎉</span>
-          <span>INVITE GUESTS</span>
-        </button>
-        <div style="margin-top:16px; font-size:0.72rem; color:var(--muted);">Share your party code and guests can add songs</div>
-      </div>
-    </div>
-  </div>
+  <!-- TOP ROW: Party Code | Now Playing | Stats -->
+  <div class="dash-top">
 
-  <!-- Sidebar (right) -->
-  <div class="sidebar">
-
-    <!-- Now Playing -->
-    <div class="panel">
-      <div class="panel-label">Now Playing</div>
-      <img id="npArt" class="now-playing-art" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3Crect fill='%2318181f'/%3E%3C/svg%3E" alt="album art">
-      <div class="np-title" id="npTitle">—</div>
-      <div class="np-artist" id="npArtist">No track playing</div>
-      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
-      <div class="controls">
-        <button class="ctrl-btn" onclick="spotifyPrev()" title="Previous">⏮</button>
-        <button class="ctrl-btn primary" id="playPauseBtn" onclick="togglePlay()">▶</button>
-        <button class="ctrl-btn" onclick="spotifyNext()" title="Next">⏭</button>
-      </div>
-      <div class="playback-status" style="margin-top:14px;">
-        <div class="dot" id="statusDot"></div>
-        <span id="statusText">Not connected</span>
-      </div>
-    </div>
-
-    <!-- Party Code -->
+    <!-- Party Code (far left) -->
     <div class="panel">
       <div class="panel-label">Party Code</div>
       <div class="party-code-display" id="partyCodeDisplay">——</div>
@@ -1044,10 +1027,32 @@
       <div class="qr-area">
         <div class="qr-placeholder" id="qrCode">QR code appears<br>after connecting</div>
       </div>
-      <button class="copy-btn" id="copyBtn" onclick="copyLink()">Copy Guest Link</button>
+      <button class="copy-btn" id="copyBtn" onclick="copyLink()">🎉 Invite Guests</button>
     </div>
 
-    <!-- Stats -->
+    <!-- Now Playing (center) -->
+    <div class="panel">
+      <div class="panel-label">Now Playing</div>
+      <div style="display:flex; gap:14px; align-items:center; margin-bottom:12px;">
+        <img id="npArt" class="now-playing-art" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3Crect fill='%2318181f'/%3E%3C/svg%3E" alt="album art" style="width:64px;height:64px;flex-shrink:0;">
+        <div style="min-width:0;">
+          <div class="np-title" id="npTitle">—</div>
+          <div class="np-artist" id="npArtist">No track playing</div>
+        </div>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="controls">
+        <button class="ctrl-btn" onclick="spotifyPrev()" title="Previous">⏮</button>
+        <button class="ctrl-btn primary" id="playPauseBtn" onclick="togglePlay()">▶</button>
+        <button class="ctrl-btn" onclick="spotifyNext()" title="Next">⏭</button>
+      </div>
+      <div class="playback-status" style="margin-top:12px;">
+        <div class="dot" id="statusDot"></div>
+        <span id="statusText">Not connected</span>
+      </div>
+    </div>
+
+    <!-- Party Stats (right) -->
     <div class="panel">
       <div class="panel-label">Party Stats</div>
       <div class="stats-grid">
@@ -1071,6 +1076,25 @@
     </div>
 
   </div>
+
+  <!-- BOTTOM: Full-width Queue -->
+  <div class="dash-bottom">
+    <div class="queue-panel">
+      <h2>QUEUE</h2>
+      <div class="queue-meta" id="queueMeta">0 songs — share your code to get started</div>
+      <div class="queue-list" id="queueList">
+        <div class="empty-queue">
+          <div style="font-size:0.85rem; margin-bottom:20px;">NO SONGS IN QUEUE</div>
+          <button class="share-big-btn" onclick="shareParty()">
+            <span style="font-size:1.4rem;">🎉</span>
+            <span>INVITE GUESTS</span>
+          </button>
+          <div style="margin-top:16px; font-size:0.72rem; color:var(--muted);">Share your party code and guests can add songs</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <script>
