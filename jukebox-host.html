@@ -506,10 +506,13 @@
     background: rgba(0,0,0,0.85);
     backdrop-filter: blur(6px);
     z-index: 1000;
-    display: flex;
+    display: none;
     align-items: center;
     justify-content: center;
     padding: 20px;
+  }
+  .modal-overlay.visible {
+    display: flex;
   }
 
   .modal {
@@ -797,6 +800,8 @@ let state = {
 
 // ── INIT ────────────────────────────────────────────────────────────
 window.onload = async () => {
+  // Hide modal immediately - it's visible by default in CSS
+  document.getElementById('configModal').classList.remove('visible');
   loadConfig();
   loadSavedState();
 
@@ -864,7 +869,7 @@ window.onload = async () => {
   if (config.clientId || config.demoMode) {
     showScreen('loginScreen');
   } else {
-    document.getElementById('configModal').style.display = 'flex';
+    document.getElementById('configModal').classList.add('visible');
   }
 };
 
@@ -916,7 +921,7 @@ function saveConfig() {
 
   config = { clientId, partyName, demoMode: false };
   localStorage.setItem('jkbx_config', JSON.stringify(config));
-  document.getElementById('configModal').style.display = 'none';
+  document.getElementById('configModal').classList.remove('visible');
   // Go straight to Spotify auth — no extra step needed
   startSpotifyAuth();
 }
@@ -925,7 +930,7 @@ function useDemoMode() {
   const partyName = document.getElementById('partyNameInput').value.trim() || 'Demo Party';
   config = { clientId: '', partyName, demoMode: true };
   localStorage.setItem('jkbx_config', JSON.stringify(config));
-  document.getElementById('configModal').style.display = 'none';
+  document.getElementById('configModal').classList.remove('visible');
   showDashboard();
   loadDemoData();
 }
@@ -936,7 +941,7 @@ function useDemoMode() {
 // AND localStorage as backup
 async function startSpotifyAuth() {
   if (config.demoMode) { showDashboard(); loadDemoData(); return; }
-  if (!config.clientId) { document.getElementById('configModal').style.display = 'flex'; return; }
+  if (!config.clientId) { document.getElementById('configModal').classList.add('visible'); return; }
 
   const verifier = generateVerifier(64);
   const challenge = await generateChallenge(verifier);
