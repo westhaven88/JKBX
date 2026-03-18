@@ -566,7 +566,8 @@ let guestState = {
   submitted: [],
   searchDebounce: null,
   clientId: '',
-  spotifyToken: ''
+  spotifyToken: '',
+  pasteId: ''
 };
 
 // ── INIT ─────────────────────────────────────────────────────────────
@@ -584,10 +585,14 @@ window.onload = () => {
     } catch(e) {}
   }
 
-  // Get Spotify token — from URL param (shared by host) or local storage (same device)
+  // Get Spotify token — from URL param 't' (same device) or dpaste 'd' (other device)
   const tokenParam = params.get('t');
+  const pasteParam = params.get('d');
   if (tokenParam && tokenParam.length > 20) {
     guestState.spotifyToken = tokenParam;
+  } else if (pasteParam) {
+    guestState.pasteId = pasteParam;
+    // Token will be fetched lazily when search is triggered
   } else {
     guestState.spotifyToken = localStorage.getItem('jkbx_token') || '';
   }
@@ -687,8 +692,29 @@ async function searchSpotify(query) {
 }
 
 async function fetchPartyToken() {
-  // Token comes from URL param — already loaded in guestState.spotifyToken at init
-  return guestState.spotifyToken || '';
+  // Token comes from URL param 't' (same device) or dpaste ID 'd' (other devices)
+  if (guestState.spotifyToken && guestState.spotifyToken.length > 20) {
+    return guestState.spotifyToken;
+  }
+
+  // Try fetching from dpaste using the 'd' param in the URL
+  const params = new URLSearchParams(window.location.search);
+  const pasteId = params.get('d');
+  if (!pasteId) return '';
+
+  try {
+    const res = await fetch(`https://dpaste.org/${pasteId}.txt`);
+    if (!res.ok) return '';
+    const text = await res.text();
+    const data = JSON.parse(text.trim());
+    if (data.token && data.token.length > 20) {
+      guestState.spotifyToken = data.token;
+      return data.token;
+    }
+  } catch(e) {
+    console.log('dpaste fetch error:', e);
+  }
+  return '';
 }
 
 async function searchViaSpotify(query, token) {
