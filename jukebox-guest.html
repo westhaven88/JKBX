@@ -661,35 +661,86 @@ function showHint() {
 
 async function searchSpotify(query) {
   showLoading();
-  try {
-    // Use iTunes Search API — free, no key needed, works in any browser
-    const url = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=8`;
-    const res = await fetch(url);
-    const data = await res.json();
 
-    if (!data.results || data.results.length === 0) {
-      document.getElementById('searchResults').innerHTML =
-        `<div class="hint">No results found for that search</div>`;
+  // Get the host's Spotify token from localStorage (shared same browser origin)
+  const spotifyToken = localStorage.getItem('jkbx_token');
+
+  if (spotifyToken) {
+    await searchViaSpotify(query, spotifyToken);
+  } else {
+    await searchViaLastFm(query);
+  }
+}
+
+async function searchViaSpotify(query, token) {
+  try {
+    const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=8`;
+    const res = await fetch(url, {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+
+    if (res.status === 401) {
+      // Token expired — fall back
+      await searchViaLastFm(query);
       return;
     }
 
-    const tracks = data.results.map(r => ({
-      id: String(r.trackId),
-      name: r.trackName,
-      artist: r.artistName,
-      album: r.collectionName,
-      duration_ms: r.trackTimeMillis || 210000,
-      albumArt: r.artworkUrl100 || r.artworkUrl60 || '',
-      uri: null,
-      previewUrl: r.previewUrl || null
+    const data = await res.json();
+    const items = data?.tracks?.items || [];
+
+    if (items.length === 0) {
+      document.getElementById('searchResults').innerHTML =
+        `<div class="hint">No results found — try a different search</div>`;
+      return;
+    }
+
+    const tracks = items.map(t => ({
+      id: t.id,
+      name: t.name,
+      artist: t.artists.map(a => a.name).join(', '),
+      album: t.album.name,
+      duration_ms: t.duration_ms,
+      albumArt: t.album.images?.[1]?.url || t.album.images?.[0]?.url || '',
+      uri: t.uri
     }));
 
     renderResults(tracks);
   } catch(e) {
+    await searchViaLastFm(query);
+  }
+}
+
+async function searchViaLastFm(query) {
+  // Last.fm API — free, no auth needed, CORS-friendly
+  try {
+    const API_KEY = 'a0ed8d8e7909fe97e8a8e9b925e81c1d';
+    const url = `https://ws.audioscrobbler.com/2.0/?method=track.search&track=${encodeURIComponent(query)}&api_key=${API_KEY}&format=json&limit=8`;
+    const res = await fetch(url);
+    const data = await res.json();
+    const matches = data?.results?.trackmatches?.track || [];
+
+    if (!matches.length) {
+      document.getElementById('searchResults').innerHTML =
+        `<div class="hint">No results found — try a different search</div>`;
+      return;
+    }
+
+    const tracks = matches.map((t, i) => ({
+      id: 'lfm-' + i + '-' + t.name.replace(/\s/g,''),
+      name: t.name,
+      artist: t.artist,
+      album: '',
+      duration_ms: 210000,
+      albumArt: (t.image?.find(img => img.size === 'medium') || t.image?.[1] || {})['#text'] || '',
+      uri: null
+    }));
+
+    renderResults(tracks, true);
+  } catch(e) {
     document.getElementById('searchResults').innerHTML = `
       <div class="hint" style="color:var(--red);">
         <span class="hint-icon">⚠️</span>
-        Couldn't search right now.<br>Try again in a moment.
+        Couldn't search right now.<br>Check your connection and try again.
       </div>`;
   }
 }
