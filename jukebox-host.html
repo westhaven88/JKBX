@@ -1546,16 +1546,21 @@ function checkGuestSubmissions() {
   if (!pending) return;
   try {
     const tracks = JSON.parse(pending);
+    let changed = false;
     tracks.forEach(track => {
       if (!state.queue.find(t => t.id === track.id)) {
         state.queue.push(track);
         if (track.submitter) state.guestCount.add(track.submitter);
-        // Add to Spotify queue
+        // Add to Spotify queue if not already added by guest directly
         if (track.uri && state.accessToken) addToSpotifyQueue(track.uri);
+        changed = true;
       }
     });
-    renderQueue();
-  } catch(e) {}
+    if (changed) {
+      renderQueue();
+      updateStats();
+    }
+  } catch(e) { console.log('checkGuestSubmissions error:', e); }
 }
 
 // ── DEMO MODE ────────────────────────────────────────────────────────
