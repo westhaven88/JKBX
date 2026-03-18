@@ -1372,9 +1372,13 @@ function setupPartyCode() {
 
   const cleanBase = window.location.origin + window.location.pathname;
   const guestUrl = cleanBase.replace('jukebox-host.html', 'jukebox-guest.html');
-  // Include token in guest URL so guests on other devices can search Spotify
   const tok = state.accessToken || localStorage.getItem('jkbx_token') || '';
-  state.guestLink = `${guestUrl}?code=${state.partyCode}&party=${encodeURIComponent(config.partyName)}&t=${tok}`;
+  // Short link for QR code — no token so it stays scannable
+  state.guestLinkShort = `${guestUrl}?code=${state.partyCode}&party=${encodeURIComponent(config.partyName)}`;
+  // Full link with token for copy/share/SMS/email
+  state.guestLink = tok
+    ? `${guestUrl}?code=${state.partyCode}&party=${encodeURIComponent(config.partyName)}&t=${tok}`
+    : state.guestLinkShort;
 
   document.getElementById('partyCodeDisplay').textContent = state.partyCode;
   document.getElementById('guestLink').textContent = state.guestLink;
@@ -1585,13 +1589,14 @@ function shareParty() {
   const partyName = config.partyName || 'Party';
 
   document.getElementById('shareCodeBig').textContent = code;
-  document.getElementById('shareLinkBox').textContent = link;
-  document.getElementById('sharePartyLabel').textContent = partyName + ' — share with your guests';
+  document.getElementById('shareLinkBox').textContent = state.guestLinkShort || link;
+  document.getElementById('sharePartyLabel').textContent = partyName + ' — scan QR or share link';
 
   // QR code
   const qrEl = document.getElementById('shareQR');
-  if (link) {
-    qrEl.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(link)}&bgcolor=111116&color=f5a623&margin=6" style="border-radius:6px;" width="140" height="140" alt="QR">`;
+  const shortLink = state.guestLinkShort || link;
+  if (shortLink) {
+    qrEl.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(shortLink)}&bgcolor=111116&color=f5a623&margin=6" style="border-radius:6px;" width="140" height="140" alt="QR">`;
   }
 
   modal.classList.add('visible');
