@@ -671,14 +671,24 @@ function showHint() {
 async function searchSpotify(query) {
   showLoading();
 
-  // Use token from URL param (other devices) or localStorage (same device)
-  const spotifyToken = guestState.spotifyToken || localStorage.getItem('jkbx_token') || '';
+  // Use token already fetched, or try to get it from JSONBin
+  let token = guestState.spotifyToken || '';
 
-  if (spotifyToken && spotifyToken.length > 20) {
-    await searchViaSpotify(query, spotifyToken);
-  } else {
-    await searchViaLastFm(query);
+  if (!token || token.length < 20) {
+    token = await fetchPartyToken();
+    if (token) guestState.spotifyToken = token;
   }
+
+  if (token && token.length > 20) {
+    await searchViaSpotify(query, token);
+  } else {
+    await searchViaMusicBrainz(query);
+  }
+}
+
+async function fetchPartyToken() {
+  // Token comes from URL param — already loaded in guestState.spotifyToken at init
+  return guestState.spotifyToken || '';
 }
 
 async function searchViaSpotify(query, token) {
@@ -690,7 +700,7 @@ async function searchViaSpotify(query, token) {
 
     if (res.status === 401) {
       // Token expired — fall back
-      await searchViaLastFm(query);
+      await searchViaMusicBrainz(query);
       return;
     }
 
@@ -715,20 +725,41 @@ async function searchViaSpotify(query, token) {
 
     renderResults(tracks);
   } catch(e) {
-    await searchViaLastFm(query);
+    await searchViaMusicBrainz(query);
   }
 }
 
-async function searchViaLastFm(query) {
+async function searchViaMusicBrainz(query) {
   // MusicBrainz API — truly open, no key, good CORS support
   try {
-    // Search by artist OR title so "Madonna" returns her songs, not songs named Madonna
-    const url = `https://musicbrainz.org/ws/2/recording/?query=(recording:${encodeURIComponent(query)}+OR+artist:${encodeURIComponent(query)})&limit=10&fmt=json`;
-    const res = await fetch(url, {
+    // Search by artist name first for best results
+    const artistUrl = `https://musicbrainz.org/ws/2/artist/?query=${encodeURIComponent(query)}&limit=1&fmt=json`;
+    const artistRes = await fetch(artistUrl, {
       headers: { 'User-Agent': 'JKBX-Party-App/1.0 (https://westhaven88.github.io/JKBX)' }
     });
-    const data = await res.json();
-    const recordings = data?.recordings || [];
+    const artistData = await artistRes.json();
+    const artistId = artistData?.artists?.[0]?.id;
+
+    let recordings = [];
+    if (artistId) {
+      // Get top recordings by this artist
+      const recUrl = `https://musicbrainz.org/ws/2/recording/?query=arid:${artistId}&limit=12&fmt=json`;
+      const recRes = await fetch(recUrl, {
+        headers: { 'User-Agent': 'JKBX-Party-App/1.0 (https://westhaven88.github.io/JKBX)' }
+      });
+      const recData = await recRes.json();
+      recordings = recData?.recordings || [];
+    }
+
+    // Fallback: search by title if no artist found
+    if (!recordings.length) {
+      const url = `https://musicbrainz.org/ws/2/recording/?query=${encodeURIComponent(query)}&limit=10&fmt=json`;
+      const res2 = await fetch(url, {
+        headers: { 'User-Agent': 'JKBX-Party-App/1.0 (https://westhaven88.github.io/JKBX)' }
+      });
+      const data2 = await res2.json();
+      recordings = data2?.recordings || [];
+    }
 
     if (!recordings.length) {
       document.getElementById('searchResults').innerHTML =
@@ -736,20 +767,24 @@ async function searchViaLastFm(query) {
       return;
     }
 
-    const tracks = recordings.slice(0, 8).map((r, i) => {
-      const artist = r['artist-credit']?.[0]?.artist?.name || r['artist-credit']?.[0]?.name || 'Unknown';
-      const release = r.releases?.[0];
-      const album = release?.title || '';
-      return {
-        id: r.id || ('mb-' + i),
-        name: r.title,
-        artist: artist,
-        album: album,
-        duration_ms: r.length || 210000,
-        albumArt: '',
-        uri: null
-      };
-    });
+    // Deduplicate by title and sort by popularity (most releases = most popular)
+    const seen = new Set();
+    const tracks = recordings
+      .filter(r => { const key = r.title.toLowerCase(); if (seen.has(key)) return false; seen.add(key); return true; })
+      .slice(0, 8)
+      .map((r, i) => {
+        const artist = r['artist-credit']?.[0]?.artist?.name || r['artist-credit']?.[0]?.name || 'Unknown';
+        const release = r.releases?.[0];
+        return {
+          id: r.id || ('mb-' + i),
+          name: r.title,
+          artist: artist,
+          album: release?.title || '',
+          duration_ms: r.length || 210000,
+          albumArt: '',
+          uri: null
+        };
+      });
 
     renderResults(tracks, true);
   } catch(e) {
