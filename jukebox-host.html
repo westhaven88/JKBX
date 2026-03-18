@@ -1372,7 +1372,9 @@ function setupPartyCode() {
 
   const cleanBase = window.location.origin + window.location.pathname;
   const guestUrl = cleanBase.replace('jukebox-host.html', 'jukebox-guest.html');
-  state.guestLink = `${guestUrl}?code=${state.partyCode}&party=${encodeURIComponent(config.partyName)}`;
+  // Include token in guest URL so guests on other devices can search Spotify
+  const tok = state.accessToken || localStorage.getItem('jkbx_token') || '';
+  state.guestLink = `${guestUrl}?code=${state.partyCode}&party=${encodeURIComponent(config.partyName)}&t=${tok}`;
 
   document.getElementById('partyCodeDisplay').textContent = state.partyCode;
   document.getElementById('guestLink').textContent = state.guestLink;
