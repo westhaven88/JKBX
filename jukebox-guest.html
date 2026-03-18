@@ -722,7 +722,8 @@ async function searchViaSpotify(query, token) {
 async function searchViaLastFm(query) {
   // MusicBrainz API — truly open, no key, good CORS support
   try {
-    const url = `https://musicbrainz.org/ws/2/recording/?query=recording:${encodeURIComponent(query)}&limit=8&fmt=json`;
+    // Search by artist OR title so "Madonna" returns her songs, not songs named Madonna
+    const url = `https://musicbrainz.org/ws/2/recording/?query=(recording:${encodeURIComponent(query)}+OR+artist:${encodeURIComponent(query)})&limit=10&fmt=json`;
     const res = await fetch(url, {
       headers: { 'User-Agent': 'JKBX-Party-App/1.0 (https://westhaven88.github.io/JKBX)' }
     });
@@ -796,41 +797,69 @@ function renderResults(tracks) {
 }
 
 // ── ADD TRACK ────────────────────────────────────────────────────────
-function addTrack(track) {
+async function addTrack(track) {
   // Check if already added
   if (guestState.submitted.find(t => t.id === track.id)) {
-    showToast('Already in your queue!', '');
+    showToast('Already added!', '');
     return;
   }
 
-  // Add submitter info
   const submission = {
     ...track,
     submitter: guestState.name,
     submittedAt: Date.now()
   };
 
+  // Optimistically update UI immediately
   guestState.submitted.push(submission);
-
-  // Save to shared localStorage for host to pick up
-  const key = 'jkbx_pending_' + guestState.code;
-  let existing = [];
-  try { existing = JSON.parse(localStorage.getItem(key) || '[]'); } catch(e) {}
-  // Avoid duplicates
-  if (!existing.find(t => t.id === track.id)) {
-    existing.push(submission);
-    localStorage.setItem(key, JSON.stringify(existing));
-  }
-
-  // Update UI
   const el = document.getElementById('ri-' + track.id);
   if (el) {
     el.classList.add('added');
     el.querySelector('.add-icon').textContent = '✓';
   }
-
-  showToast(`"${track.name}" added to queue! 🎉`, 'success');
   renderMySubmissions();
+
+  let addedToSpotify = false;
+
+  // Try adding directly to Spotify queue using the token from URL
+  const token = guestState.spotifyToken;
+  if (token && track.uri) {
+    try {
+      const res = await fetch(`https://api.spotify.com/v1/me/player/queue?uri=${encodeURIComponent(track.uri)}`, {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token }
+      });
+      if (res.status === 204 || res.ok) {
+        addedToSpotify = true;
+        showToast(`"${track.name}" added to Spotify! 🎉`, 'success');
+      } else {
+        const err = await res.json().catch(() => ({}));
+        console.log('Spotify queue error:', err);
+      }
+    } catch(e) {
+      console.log('Spotify fetch error:', e);
+    }
+  }
+
+  // Also save to localStorage (works when guest is on same device as host,
+  // or as a record of what was requested)
+  const key = 'jkbx_pending_' + guestState.code;
+  let existing = [];
+  try { existing = JSON.parse(localStorage.getItem(key) || '[]'); } catch(e) {}
+  if (!existing.find(t => t.id === track.id)) {
+    existing.push(submission);
+    localStorage.setItem(key, JSON.stringify(existing));
+  }
+
+  if (!addedToSpotify) {
+    if (!token) {
+      showToast(`"${track.name}" queued! ✓`, 'success');
+    } else if (!track.uri) {
+      showToast(`"${track.name}" queued! (no Spotify URI)`, 'success');
+    } else {
+      showToast(`"${track.name}" saved — host will see it shortly`, 'success');
+    }
+  }
 
   // Show limit warning at 3
   if (guestState.submitted.length >= 3) {
