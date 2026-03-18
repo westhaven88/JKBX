@@ -638,11 +638,304 @@
     line-height: 1.5;
   }
 
+  /* Share button in empty queue */
+  .share-big-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--amber);
+    border: none;
+    color: #000;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.1rem;
+    letter-spacing: 0.1em;
+    padding: 14px 28px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 0 24px rgba(245,166,35,0.25);
+  }
+  .share-big-btn:hover { background: #f7b93a; transform: translateY(-2px); box-shadow: 0 0 40px rgba(245,166,35,0.4); }
+
+  /* Share modal */
+  .share-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    backdrop-filter: blur(8px);
+    z-index: 2000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .share-modal-overlay.visible { display: flex; }
+
+  .share-modal {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 32px;
+    max-width: 440px;
+    width: 100%;
+    position: relative;
+  }
+
+  .share-modal-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2rem;
+    letter-spacing: 0.1em;
+    color: var(--amber);
+    margin-bottom: 4px;
+  }
+
+  .share-modal-sub {
+    font-size: 0.82rem;
+    color: var(--muted);
+    margin-bottom: 24px;
+  }
+
+  .share-code-big {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 4rem;
+    letter-spacing: 0.25em;
+    color: var(--amber);
+    text-align: center;
+    text-shadow: 0 0 30px rgba(245,166,35,0.4);
+    background: var(--deep);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .share-link-box {
+    background: var(--deep);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--muted);
+    word-break: break-all;
+    margin-bottom: 16px;
+    line-height: 1.6;
+  }
+
+  .share-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .share-action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    background: var(--deep);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .share-action-btn:hover { border-color: var(--amber); color: var(--amber); transform: translateY(-1px); }
+  .share-action-btn.success { border-color: var(--green); color: var(--green); }
+  .share-action-btn .btn-icon { font-size: 1.4rem; }
+
+  .share-close-btn {
+    width: 100%;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.85rem;
+    padding: 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 4px;
+  }
+  .share-close-btn:hover { border-color: var(--text); color: var(--text); }
+
+  .share-qr {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 16px;
+  }
+
+  /* Share button in empty queue */
+  .share-big-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--amber);
+    border: none;
+    color: #000;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.1rem;
+    letter-spacing: 0.1em;
+    padding: 14px 28px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 0 24px rgba(245,166,35,0.25);
+  }
+  .share-big-btn:hover { background: #f7b93a; transform: translateY(-2px); }
+
+  .share-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.88);
+    backdrop-filter: blur(8px);
+    z-index: 2000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .share-modal-overlay.visible { display: flex; }
+  .share-modal {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 32px;
+    max-width: 420px;
+    width: 100%;
+  }
+  .share-modal-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2rem;
+    letter-spacing: 0.1em;
+    color: var(--amber);
+    margin-bottom: 4px;
+  }
+  .share-modal-sub { font-size: 0.82rem; color: var(--muted); margin-bottom: 20px; }
+  .share-code-big {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 3.8rem;
+    letter-spacing: 0.25em;
+    color: var(--amber);
+    text-align: center;
+    text-shadow: 0 0 30px rgba(245,166,35,0.4);
+    background: var(--deep);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    margin-bottom: 14px;
+  }
+  .share-qr { display: flex; justify-content: center; margin-bottom: 14px; }
+  .share-link-box {
+    background: var(--deep);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--muted);
+    word-break: break-all;
+    margin-bottom: 14px;
+    line-height: 1.6;
+  }
+  .share-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .share-action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    background: var(--deep);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .share-action-btn:hover { border-color: var(--amber); color: var(--amber); }
+  .share-action-btn.success { border-color: var(--green); color: var(--green); }
+  .share-action-btn .btn-icon { font-size: 1.3rem; }
+  .share-close-btn {
+    width: 100%;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.85rem;
+    padding: 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .share-close-btn:hover { border-color: var(--text); color: var(--text); }
+
   @media (max-width: 900px) {
     #dashScreen.active { grid-template-columns: 1fr; }
     .topbar { padding: 16px 20px; }
     #dashScreen { padding: 20px; }
   }
+
+  /* Share button */
+  .share-big-btn {
+    display: inline-flex; align-items: center; gap: 10px;
+    background: var(--amber); border: none; color: #000;
+    font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem;
+    letter-spacing: 0.1em; padding: 14px 28px; border-radius: 6px;
+    cursor: pointer; transition: all 0.2s; box-shadow: 0 0 24px rgba(245,166,35,0.25);
+  }
+  .share-big-btn:hover { background: #f7b93a; transform: translateY(-2px); }
+  .share-modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.88);
+    backdrop-filter: blur(8px); z-index: 2000; display: none;
+    align-items: center; justify-content: center; padding: 20px;
+  }
+  .share-modal-overlay.visible { display: flex; }
+  .share-modal { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 32px; max-width: 420px; width: 100%; }
+  .share-modal-title { font-family: 'Bebas Neue', sans-serif; font-size: 2rem; letter-spacing: 0.1em; color: var(--amber); margin-bottom: 4px; }
+  .share-modal-sub { font-size: 0.82rem; color: var(--muted); margin-bottom: 20px; }
+  .share-code-big {
+    font-family: 'Bebas Neue', sans-serif; font-size: 3.8rem; letter-spacing: 0.25em;
+    color: var(--amber); text-align: center; text-shadow: 0 0 30px rgba(245,166,35,0.4);
+    background: var(--deep); border: 1px solid var(--border); border-radius: 8px;
+    padding: 14px; margin-bottom: 14px;
+  }
+  .share-qr { display: flex; justify-content: center; margin-bottom: 14px; }
+  .share-link-box {
+    background: var(--deep); border: 1px solid var(--border); border-radius: 6px;
+    padding: 10px 14px; font-family: 'DM Mono', monospace; font-size: 0.68rem;
+    color: var(--muted); word-break: break-all; margin-bottom: 14px; line-height: 1.6;
+  }
+  .share-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+  .share-action-btn {
+    display: flex; flex-direction: column; align-items: center; gap: 5px;
+    background: var(--deep); border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px 8px; cursor: pointer; transition: all 0.2s; color: var(--text);
+    font-family: 'DM Mono', monospace; font-size: 0.65rem; letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  .share-action-btn:hover { border-color: var(--amber); color: var(--amber); }
+  .share-action-btn.success { border-color: var(--green); color: var(--green); }
+  .share-action-btn .btn-icon { font-size: 1.3rem; }
+  .share-close-btn {
+    width: 100%; background: transparent; border: 1px solid var(--border);
+    color: var(--muted); font-family: 'DM Sans', sans-serif; font-size: 0.85rem;
+    padding: 10px; border-radius: 6px; cursor: pointer; transition: all 0.2s;
+  }
+  .share-close-btn:hover { border-color: var(--text); color: var(--text); }
 </style>
 </head>
 <body>
@@ -711,7 +1004,14 @@
     <h2>QUEUE</h2>
     <div class="queue-meta" id="queueMeta">0 songs — share your code to get started</div>
     <div class="queue-list" id="queueList">
-      <div class="empty-queue">NO SONGS IN QUEUE<br><br>Share your party code with guests<br>and songs will appear here</div>
+      <div class="empty-queue">
+        <div style="font-size:0.85rem; margin-bottom:20px;">NO SONGS IN QUEUE</div>
+        <button class="share-big-btn" onclick="shareParty()">
+          <span style="font-size:1.4rem;">🎉</span>
+          <span>INVITE GUESTS</span>
+        </button>
+        <div style="margin-top:16px; font-size:0.72rem; color:var(--muted);">Share your party code and guests can add songs</div>
+      </div>
     </div>
   </div>
 
@@ -1250,11 +1550,169 @@ function loadDemoData() {
   setInterval(checkGuestSubmissions, 2000);
 }
 
+// ── SHARE ────────────────────────────────────────────────────────────
+function shareParty() {
+  const modal = document.getElementById('shareModal');
+  const code = state.partyCode || '——';
+  const link = state.guestLink || '';
+  const partyName = config.partyName || 'Party';
+
+  document.getElementById('shareCodeBig').textContent = code;
+  document.getElementById('shareLinkBox').textContent = link;
+  document.getElementById('sharePartyLabel').textContent = partyName + ' — share with your guests';
+
+  // QR code
+  const qrEl = document.getElementById('shareQR');
+  if (link) {
+    qrEl.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(link)}&bgcolor=111116&color=f5a623&margin=6" style="border-radius:6px;" width="140" height="140" alt="QR">`;
+  }
+
+  modal.classList.add('visible');
+}
+
+function closeShareModal() {
+  document.getElementById('shareModal').classList.remove('visible');
+}
+
+function shareAction(type) {
+  const link = state.guestLink || '';
+  const code = state.partyCode || '';
+  const partyName = config.partyName || 'Party';
+  const msg = `🎵 Join ${partyName}! Add songs to the queue: ${link}  (Party code: ${code})`;
+
+  if (type === 'copy') {
+    navigator.clipboard.writeText(link).then(() => {
+      const btn = document.getElementById('copyLinkBtn');
+      btn.classList.add('success');
+      btn.querySelector('span:last-child').textContent = 'Copied!';
+      setTimeout(() => {
+        btn.classList.remove('success');
+        btn.querySelector('span:last-child').textContent = 'Copy Link';
+      }, 2500);
+    });
+  } else if (type === 'native') {
+    if (navigator.share) {
+      navigator.share({ title: partyName + ' Jukebox', text: msg, url: link });
+    } else {
+      // Fallback: copy
+      navigator.clipboard.writeText(msg);
+      const btn = document.getElementById('nativeShareBtn');
+      btn.classList.add('success');
+      btn.querySelector('span:last-child').textContent = 'Copied!';
+      setTimeout(() => { btn.classList.remove('success'); btn.querySelector('span:last-child').textContent = 'Share / Text'; }, 2500);
+    }
+  } else if (type === 'sms') {
+    window.open(`sms:?body=${encodeURIComponent(msg)}`);
+  } else if (type === 'email') {
+    window.open(`mailto:?subject=${encodeURIComponent('Join ' + partyName + ' Jukebox')}&body=${encodeURIComponent(msg)}`);
+  }
+}
+
+// Also update the existing copyLink to use shareParty
+function copyLink() {
+  shareParty();
+}
+
 // ── UTILS ────────────────────────────────────────────────────────────
 function escHtml(str) {
   return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 </script>
+
+
+<!-- SHARE MODAL -->
+<div class="share-modal-overlay" id="shareModal">
+  <div class="share-modal">
+    <div class="share-modal-title">INVITE GUESTS</div>
+    <div class="share-modal-sub" id="sharePartyLabel">Share this code or link with your guests</div>
+
+    <div class="share-code-big" id="shareCodeBig">——</div>
+
+    <div class="share-qr">
+      <div id="shareQR" style="width:140px;height:140px;background:var(--deep);border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:0.7rem;">Loading...</div>
+    </div>
+
+    <div class="share-link-box" id="shareLinkBox">—</div>
+
+    <div class="share-actions">
+      <button class="share-action-btn" id="copyLinkBtn" onclick="shareAction('copy')">
+        <span class="btn-icon">📋</span>
+        <span>Copy Link</span>
+      </button>
+      <button class="share-action-btn" id="nativeShareBtn" onclick="shareAction('native')">
+        <span class="btn-icon">📤</span>
+        <span>Share / Text</span>
+      </button>
+      <button class="share-action-btn" onclick="shareAction('sms')">
+        <span class="btn-icon">💬</span>
+        <span>Send SMS</span>
+      </button>
+      <button class="share-action-btn" onclick="shareAction('email')">
+        <span class="btn-icon">✉️</span>
+        <span>Send Email</span>
+      </button>
+    </div>
+
+    <button class="share-close-btn" onclick="closeShareModal()">Close</button>
+  </div>
+</div>
+
+
+<!-- SHARE MODAL -->
+<div class="share-modal-overlay" id="shareModal">
+  <div class="share-modal">
+    <div class="share-modal-title">INVITE GUESTS</div>
+    <div class="share-modal-sub" id="sharePartyLabel">Share this code or link with your guests</div>
+    <div class="share-code-big" id="shareCodeBig">——</div>
+    <div class="share-qr">
+      <div id="shareQR" style="width:140px;height:140px;background:var(--deep);border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:0.7rem;font-family:monospace;">Loading...</div>
+    </div>
+    <div class="share-link-box" id="shareLinkBox">—</div>
+    <div class="share-actions">
+      <button class="share-action-btn" id="copyLinkBtn" onclick="shareAction('copy')">
+        <span class="btn-icon">📋</span><span>Copy Link</span>
+      </button>
+      <button class="share-action-btn" id="nativeShareBtn" onclick="shareAction('native')">
+        <span class="btn-icon">📤</span><span>Share / Text</span>
+      </button>
+      <button class="share-action-btn" onclick="shareAction('sms')">
+        <span class="btn-icon">💬</span><span>Send SMS</span>
+      </button>
+      <button class="share-action-btn" onclick="shareAction('email')">
+        <span class="btn-icon">✉️</span><span>Send Email</span>
+      </button>
+    </div>
+    <button class="share-close-btn" onclick="closeShareModal()">Close</button>
+  </div>
+</div>
+
+<!-- SHARE MODAL -->
+<div class="share-modal-overlay" id="shareModal">
+  <div class="share-modal">
+    <div class="share-modal-title">INVITE GUESTS</div>
+    <div class="share-modal-sub" id="sharePartyLabel">Share this code or link with your guests</div>
+    <div class="share-code-big" id="shareCodeBig">——</div>
+    <div class="share-qr">
+      <div id="shareQR" style="width:140px;height:140px;background:var(--deep);border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:0.7rem;font-family:monospace;">Loading...</div>
+    </div>
+    <div class="share-link-box" id="shareLinkBox">—</div>
+    <div class="share-actions">
+      <button class="share-action-btn" id="copyLinkBtn" onclick="shareAction('copy')">
+        <span class="btn-icon">📋</span><span>Copy Link</span>
+      </button>
+      <button class="share-action-btn" id="nativeShareBtn" onclick="shareAction('native')">
+        <span class="btn-icon">📤</span><span>Share / Text</span>
+      </button>
+      <button class="share-action-btn" onclick="shareAction('sms')">
+        <span class="btn-icon">💬</span><span>Send SMS</span>
+      </button>
+      <button class="share-action-btn" onclick="shareAction('email')">
+        <span class="btn-icon">✉️</span><span>Send Email</span>
+      </button>
+    </div>
+    <button class="share-close-btn" onclick="closeShareModal()">Close</button>
+  </div>
+</div>
 
 </body>
 </html>
