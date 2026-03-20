@@ -653,33 +653,34 @@ async function doSearch(query) {
   const token = guestState.spotifyToken;
   if (!token || token.length < 20) {
     document.getElementById('searchResults').innerHTML =
-      '<div class="hint" style="color:var(--red);">No Spotify connection.</div>';
+      '<div class="hint" style="color:var(--red);">No Spotify connection.<br>Ask host to resend invite link.</div>';
     return;
   }
 
   try {
-    const url = 'https://api.spotify.com/v1/search?q=' + encodeURIComponent(query) + '&type=track&limit=20';
-    const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
-    const rawText = await res.text();
+    // Build URL carefully - limit must be an integer with no extra characters
+    const searchUrl = new URL('https://api.spotify.com/v1/search');
+    searchUrl.searchParams.set('q', query);
+    searchUrl.searchParams.set('type', 'track');
+    searchUrl.searchParams.set('limit', '10');
+    searchUrl.searchParams.set('market', 'US');
 
-    // Show full debug info on screen
-    let data;
-    try { data = JSON.parse(rawText); } catch(e) { data = {}; }
+    const res = await fetch(searchUrl.toString(), {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
 
+    if (res.status === 401) {
+      document.getElementById('searchResults').innerHTML =
+        '<div class="hint" style="color:var(--red);">Session expired — get a fresh invite link from host.</div>';
+      return;
+    }
+
+    const data = await res.json();
     const items = data?.tracks?.items || [];
 
     if (!items.length) {
-      // Show exactly what Spotify returned so we can diagnose
-      const errorMsg = data?.error?.message || data?.error?.status || '';
-      const itemCount = data?.tracks?.total ?? 'unknown';
       document.getElementById('searchResults').innerHTML =
-        '<div style="padding:20px;font-family:monospace;font-size:0.72rem;color:#a0a0b8;word-break:break-all;line-height:1.8;">' +
-        'HTTP: ' + res.status + '<br>' +
-        'Total results: ' + itemCount + '<br>' +
-        (errorMsg ? 'Error: ' + errorMsg + '<br>' : '') +
-        'Token start: ' + token.substring(0,12) + '...<br>' +
-        'Raw: ' + rawText.substring(0, 200) +
-        '</div>';
+        '<div class="hint">No results — try a different search</div>';
       return;
     }
 
@@ -694,7 +695,7 @@ async function doSearch(query) {
     })));
   } catch(e) {
     document.getElementById('searchResults').innerHTML =
-      '<div style="padding:20px;font-family:monospace;font-size:0.72rem;color:#e84040;">Fetch error: ' + e.message + '</div>';
+      '<div class="hint" style="color:var(--red);">Search error — please try again</div>';
   }
 }
 
