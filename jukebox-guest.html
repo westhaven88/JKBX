@@ -523,6 +523,7 @@
 
 <!-- SEARCH SCREEN -->
 <div id="searchScreen" class="screen">
+  <div id="tokenStatus" style="font-family:monospace;font-size:0.72rem;padding:4px 0 8px;"></div>
   <div class="search-hero">
     <div class="welcome-line">Welcome to the party</div>
     <div class="welcome-name" id="welcomeName">Hey there!</div>
@@ -560,136 +561,78 @@
 
 <script>
 // ── STATE ────────────────────────────────────────────────────────────
-let guestState = {
+const guestState = {
   code: '',
   name: '',
   partyName: '',
-  submitted: [],
-  searchDebounce: null,
-  clientId: '',
   spotifyToken: '',
-  pasteId: ''
+  submitted: [],
+  searchDebounce: null
 };
 
 // ── INIT ─────────────────────────────────────────────────────────────
 window.onload = () => {
-  const params = new URLSearchParams(window.location.search);
-  const code = params.get('code');
-  const party = params.get('party');
-  const tokenParam = params.get('t');
+  try {
+    const params = new URLSearchParams(window.location.search);
+    guestState.code    = params.get('code') || '';
+    guestState.partyName = params.get('party') ? decodeURIComponent(params.get('party')) : 'Party';
+    guestState.spotifyToken = params.get('t') || '';
 
-  // ALWAYS read token fresh from URL - never use cached token
-  // Store it in sessionStorage only (cleared when tab closes)
-  if (tokenParam && tokenParam.length > 20) {
-    sessionStorage.setItem('jkbx_token', tokenParam);
-    guestState.spotifyToken = tokenParam;
-  } else {
-    // Try sessionStorage (same tab refresh)
-    const sessToken = sessionStorage.getItem('jkbx_token');
-    if (sessToken && sessToken.length > 20) {
-      guestState.spotifyToken = sessToken;
-    }
-  }
-
-  // Set code and party from URL
-  if (code) {
-    guestState.code = code;
-    guestState.partyName = party ? decodeURIComponent(party) : 'Party';
-  }
-
-  // Update header
-  document.getElementById('headerCode').textContent = guestState.code || '—';
-  document.getElementById('headerPartyName').textContent = guestState.partyName || 'Party';
-
-  // If we have a saved name for this code, auto-show search
-  const savedName = localStorage.getItem('jkbx_name_' + guestState.code);
-  if (savedName && guestState.code) {
-    guestState.name = savedName;
-    showSearch();
-    renderMySubmissions();
-    return;
-  }
-
-  // Pre-fill name field with last used name
-  const anyName = localStorage.getItem('jkbx_guest_name');
-  if (anyName) document.getElementById('nameInput').value = anyName;
-
-  // Load host config for Spotify client ID
-  const savedConfig = localStorage.getItem('jkbx_config');
-  if (savedConfig) {
-    try {
-      const cfg = JSON.parse(savedConfig);
-      guestState.clientId = cfg.clientId || '';
-    } catch(e) {}
-  }
-
-  // Token already handled above — just set fallback if nothing found yet
-  if (!guestState.spotifyToken) {
-    guestState.spotifyToken = localStorage.getItem('jkbx_token') || '';
-  }
-
-  // Load saved name
-  const savedName = localStorage.getItem('jkbx_guest_name');
-  if (savedName) document.getElementById('nameInput').value = savedName;
-
-  if (code) {
-    guestState.code = code;
-    guestState.partyName = party ? decodeURIComponent(party) : 'Party';
-    document.getElementById('codeInput').value = code;
-    document.getElementById('headerCode').textContent = code;
+    // Update header
+    document.getElementById('headerCode').textContent = guestState.code || '—';
     document.getElementById('headerPartyName').textContent = guestState.partyName;
 
-    // Auto-join if name is saved
-    if (savedName) {
-      guestState.name = savedName;
-      showSearch();
-      return;
-    }
-  }
+    // Pre-fill name from last visit
+    const savedName = localStorage.getItem('jkbx_guest_name');
+    if (savedName) document.getElementById('nameInput').value = savedName;
 
-  showScreen('joinScreen');
+    // Pre-fill code
+    if (guestState.code) document.getElementById('codeInput').value = guestState.code;
+
+    showScreen('joinScreen');
+  } catch(e) {
+    document.body.innerHTML = '<div style="padding:40px;color:#e84040;font-family:monospace;">Error: ' + e.message + '</div>';
+  }
 };
+
+// ── SCREENS ──────────────────────────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const el = document.getElementById(id);
+  if (el) el.classList.add('active');
+}
 
 // ── JOIN ─────────────────────────────────────────────────────────────
 function joinParty() {
   const code = document.getElementById('codeInput').value.trim().toUpperCase();
   const name = document.getElementById('nameInput').value.trim();
-
-  if (code.length < 4) { showToast('Enter a valid party code', 'error'); return; }
+  if (!code) { showToast('Enter a party code', 'error'); return; }
   if (!name) { showToast('Enter your name', 'error'); return; }
 
   guestState.code = code;
   guestState.name = name;
   localStorage.setItem('jkbx_guest_name', name);
-  localStorage.setItem('jkbx_name_' + code, name);
-  saveGuestState();
-  showSearch();
-}
 
-function showSearch() {
-  document.getElementById('headerCode').textContent = guestState.code;
-  document.getElementById('headerPartyName').textContent = guestState.partyName || 'Party';
-  document.getElementById('welcomeName').textContent = `Hey, ${guestState.name}!`;
-  document.getElementById('welcomeParty').textContent = guestState.partyName || `Party ${guestState.code}`;
+  document.getElementById('headerCode').textContent = code;
+  document.getElementById('welcomeName').textContent = 'Hey, ' + name + '!';
+  document.getElementById('welcomeParty').textContent = guestState.partyName || ('Party ' + code);
+
+  // Show token status
+  const hasToken = guestState.spotifyToken && guestState.spotifyToken.length > 20;
+  document.getElementById('tokenStatus').textContent = hasToken
+    ? '🟢 Spotify connected'
+    : '🔴 No Spotify token — search may be limited';
+  document.getElementById('tokenStatus').style.color = hasToken ? '#1DB954' : '#e84040';
+
   showScreen('searchScreen');
-  document.getElementById('searchInput').focus();
-}
-
-// ── SCREENS ──────────────────────────────────────────────────────────
-function showScreen(id) {
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
 }
 
 // ── SEARCH ───────────────────────────────────────────────────────────
 function onSearchInput(val) {
   document.getElementById('clearBtn').style.display = val ? 'block' : 'none';
   clearTimeout(guestState.searchDebounce);
-  if (!val.trim()) {
-    showHint();
-    return;
-  }
-  guestState.searchDebounce = setTimeout(() => searchSpotify(val.trim()), 400);
+  if (!val.trim()) { showHint(); return; }
+  guestState.searchDebounce = setTimeout(() => doSearch(val.trim()), 500);
 }
 
 function clearSearch() {
@@ -699,66 +642,28 @@ function clearSearch() {
 }
 
 function showHint() {
-  document.getElementById('searchResults').innerHTML = `
-    <div class="hint">
-      <span class="hint-icon">🎵</span>
-      Search for any song and add it<br>to the party queue
-    </div>`;
+  document.getElementById('searchResults').innerHTML =
+    '<div class="hint"><span class="hint-icon">🎵</span>Search for any song or artist</div>';
 }
 
-async function searchSpotify(query) {
-  showLoading();
+async function doSearch(query) {
+  document.getElementById('searchResults').innerHTML =
+    '<div class="spinner"><div class="spin-ring"></div>Searching...</div>';
 
-  let token = guestState.spotifyToken || '';
+  const token = guestState.spotifyToken;
   if (!token || token.length < 20) {
-    token = await fetchPartyToken();
-    if (token) guestState.spotifyToken = token;
+    document.getElementById('searchResults').innerHTML =
+      '<div class="hint" style="color:var(--red);">No Spotify connection.<br>Ask host to resend the invite link.</div>';
+    return;
   }
 
-  if (token && token.length > 20) {
-    await searchViaSpotify(query, token);
-  } else {
-    document.getElementById('searchResults').innerHTML = `
-      <div class="hint">
-        <span class="hint-icon">🔗</span>
-        Open the invite link from your host to enable search.
-      </div>`;
-  }
-}
-
-async function fetchPartyToken() {
-  // 1. Check memory
-  if (guestState.spotifyToken && guestState.spotifyToken.length > 20) {
-    return guestState.spotifyToken;
-  }
-  // 2. Check sessionStorage (survives refresh, not tab close)
-  const sess = sessionStorage.getItem('jkbx_token');
-  if (sess && sess.length > 20) {
-    guestState.spotifyToken = sess;
-    return sess;
-  }
-  // 3. Check URL
-  const t = new URLSearchParams(window.location.search).get('t');
-  if (t && t.length > 20) {
-    guestState.spotifyToken = t;
-    sessionStorage.setItem('jkbx_token', t);
-    return t;
-  }
-  return '';
-}
-
-async function searchViaSpotify(query, token) {
   try {
-    // Search Spotify tracks directly — simple and reliable
-    const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=20`;
-    const res = await fetch(url, {
-      headers: { 'Authorization': 'Bearer ' + token }
-    });
+    const url = 'https://api.spotify.com/v1/search?q=' + encodeURIComponent(query) + '&type=track&limit=20';
+    const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
 
     if (res.status === 401) {
-      guestState.spotifyToken = '';
       document.getElementById('searchResults').innerHTML =
-        `<div class="hint">Session expired — please re-scan the QR code</div>`;
+        '<div class="hint" style="color:var(--red);">Token expired.<br>Ask host to resend invite link.</div>';
       return;
     }
 
@@ -767,11 +672,11 @@ async function searchViaSpotify(query, token) {
 
     if (!items.length) {
       document.getElementById('searchResults').innerHTML =
-        `<div class="hint">No results found — try a different search</div>`;
+        '<div class="hint">No results — try a different search</div>';
       return;
     }
 
-    const tracks = items.map(t => ({
+    renderResults(items.map(t => ({
       id: t.id,
       name: t.name,
       artist: t.artists.map(a => a.name).join(', '),
@@ -779,388 +684,144 @@ async function searchViaSpotify(query, token) {
       duration_ms: t.duration_ms,
       albumArt: t.album?.images?.[1]?.url || t.album?.images?.[0]?.url || '',
       uri: t.uri
-    }));
-
-    renderResults(tracks);
+    })));
   } catch(e) {
-    console.log('Search error:', e);
     document.getElementById('searchResults').innerHTML =
-      `<div class="hint">Search error — please try again</div>`;
+      '<div class="hint" style="color:var(--red);">Search error — try again</div>';
   }
 }
 
-async function searchViaMusicBrainz(query) {
-  // MusicBrainz API — truly open, no key, good CORS support
-  try {
-    // Search by artist name — try with and without "The" prefix
-    const artistUrl = `https://musicbrainz.org/ws/2/artist/?query=${encodeURIComponent(query)}&limit=3&fmt=json`;
-    const artistRes = await fetch(artistUrl, {
-      headers: { 'User-Agent': 'JKBX-Party-App/1.0 (https://westhaven88.github.io/JKBX)' }
-    });
-    const artistData = await artistRes.json();
-    // Pick best match — prefer exact name match, else first result
-    const artists = artistData?.artists || [];
-    const exactMatch = artists.find(a => 
-      a.name.toLowerCase() === query.toLowerCase() || 
-      a.name.toLowerCase() === ('the ' + query.toLowerCase())
-    );
-    const artistId = (exactMatch || artists[0])?.id;
-
-    let recordings = [];
-    if (artistId) {
-      // Get top recordings by this artist
-      const recUrl = `https://musicbrainz.org/ws/2/recording/?query=arid:${artistId}&limit=20&fmt=json`;
-      const recRes = await fetch(recUrl, {
-        headers: { 'User-Agent': 'JKBX-Party-App/1.0 (https://westhaven88.github.io/JKBX)' }
-      });
-      const recData = await recRes.json();
-      recordings = recData?.recordings || [];
-    }
-
-    // Fallback: search by title OR try "The [query]" for band names
-    if (!recordings.length) {
-      // Try "The Doors" if user typed "Doors"
-      const theQuery = query.toLowerCase().startsWith('the ') ? query : 'The ' + query;
-      const artistUrl2 = `https://musicbrainz.org/ws/2/artist/?query=${encodeURIComponent(theQuery)}&limit=1&fmt=json`;
-      const artistRes2 = await fetch(artistUrl2, {
-        headers: { 'User-Agent': 'JKBX-Party-App/1.0 (https://westhaven88.github.io/JKBX)' }
-      });
-      const artistData2 = await artistRes2.json();
-      const artistId2 = artistData2?.artists?.[0]?.id;
-      if (artistId2) {
-        const recUrl2 = `https://musicbrainz.org/ws/2/recording/?query=arid:${artistId2}&limit=20&fmt=json`;
-        const recRes2 = await fetch(recUrl2, {
-          headers: { 'User-Agent': 'JKBX-Party-App/1.0 (https://westhaven88.github.io/JKBX)' }
-        });
-        const recData2 = await recRes2.json();
-        recordings = recData2?.recordings || [];
-      }
-    }
-    if (!recordings.length) {
-      const url = `https://musicbrainz.org/ws/2/recording/?query=${encodeURIComponent(query)}&limit=20&fmt=json`;
-      const res2 = await fetch(url, {
-        headers: { 'User-Agent': 'JKBX-Party-App/1.0 (https://westhaven88.github.io/JKBX)' }
-      });
-      const data2 = await res2.json();
-      recordings = data2?.recordings || [];
-    }
-
-    if (!recordings.length) {
-      document.getElementById('searchResults').innerHTML =
-        `<div class="hint">No results found — try a different search</div>`;
-      return;
-    }
-
-    // Deduplicate by title and sort by popularity (most releases = most popular)
-    const seen = new Set();
-    const tracks = recordings
-      .filter(r => { const key = r.title.toLowerCase(); if (seen.has(key)) return false; seen.add(key); return true; })
-      .slice(0, 20)
-      .map((r, i) => {
-        const artist = r['artist-credit']?.[0]?.artist?.name || r['artist-credit']?.[0]?.name || 'Unknown';
-        const release = r.releases?.[0];
-        return {
-          id: r.id || ('mb-' + i),
-          name: r.title,
-          artist: artist,
-          album: release?.title || '',
-          duration_ms: r.length || 210000,
-          albumArt: '',
-          uri: null
-        };
-      });
-
-    renderResults(tracks, true);
-  } catch(e) {
-    document.getElementById('searchResults').innerHTML = `
-      <div class="hint" style="color:var(--red);">
-        <span class="hint-icon">⚠️</span>
-        Search unavailable.<br>Try scanning the QR code again from the host screen.
-      </div>`;
-  }
-}
-
-function showLoading() {
-  document.getElementById('searchResults').innerHTML = `
-    <div class="spinner">
-      <div class="spin-ring"></div>
-      Searching...
-    </div>`;
-}
-
+// ── RESULTS ──────────────────────────────────────────────────────────
 function renderResults(tracks) {
-  if (!tracks.length) {
-    document.getElementById('searchResults').innerHTML = `
-      <div class="hint">No results found for that search</div>`;
-    return;
-  }
-
   const addedIds = new Set(guestState.submitted.map(t => t.id));
-
-  const hasSpotify = tracks.length > 0 && tracks[0].uri;
-  const sourceLabel = hasSpotify ? 'Spotify search' : 'Music search';
-  document.getElementById('searchResults').innerHTML = `
-    <div class="ai-badge"><div class="ai-dot"></div> ${sourceLabel}</div>
-    <div class="section-label">Results</div>
-    <div class="results-list">
-      ${tracks.map(track => `
-        <div class="result-item ${addedIds.has(track.id) ? 'added' : ''}" id="ri-${track.id}" onclick="addTrack(${JSON.stringify(track).replace(/"/g, '&quot;')})">
-          <img class="result-art" src="${track.albumArt}" alt="" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 1 1\'%3E%3Crect fill=\'%2318181f\'/%3E%3C/svg%3E'">
-          <div class="result-info">
-            <div class="result-name">${escHtml(track.name)}</div>
-            <div class="result-meta">${escHtml(track.artist)} · ${escHtml(track.album || '')}</div>
-          </div>
-          <span class="result-duration">${formatDuration(track.duration_ms)}</span>
-          <span class="add-icon">${addedIds.has(track.id) ? '✓' : '+'}</span>
+  document.getElementById('searchResults').innerHTML =
+    '<div class="section-label">Results</div>' +
+    '<div class="results-list">' +
+    tracks.map(track => `
+      <div class="result-item ${addedIds.has(track.id) ? 'added' : ''}" id="ri-${esc(track.id)}"
+           onclick='addTrack(${JSON.stringify(track).replace(/'/g,"&#39;")})'>
+        <img class="result-art" src="${esc(track.albumArt)}" alt=""
+             onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 1 1\'%3E%3Crect fill=\'%2318181f\'/%3E%3C/svg%3E'">
+        <div class="result-info">
+          <div class="result-name">${esc(track.name)}</div>
+          <div class="result-meta">${esc(track.artist)}${track.album ? ' · ' + esc(track.album) : ''}</div>
         </div>
-      `).join('')}
-    </div>`;
+        <span class="result-duration">${fmt(track.duration_ms)}</span>
+        <span class="add-icon">${addedIds.has(track.id) ? '✓' : '+'}</span>
+      </div>`).join('') +
+    '</div>';
 }
 
 // ── ADD TRACK ────────────────────────────────────────────────────────
 async function addTrack(track) {
   if (guestState.submitted.find(t => t.id === track.id)) {
-    showToast('Already added!', '');
-    return;
+    showToast('Already added!', ''); return;
   }
 
   const el = document.getElementById('ri-' + track.id);
-  if (el) { el.classList.add('added'); el.querySelector('.add-icon').textContent = '⏳'; }
+  if (el) el.querySelector('.add-icon').textContent = '⏳';
 
-  showStatus('Step 1: Getting Spotify token...');
-
-  // Get token
-  let token = guestState.spotifyToken || '';
-  if (!token || token.length < 20) {
-    token = await fetchPartyToken();
-    if (token) guestState.spotifyToken = token;
-  }
-
-  if (!token || token.length < 20) {
-    showStatus('❌ No Spotify token found. Ask host to re-share the invite link.', true);
-    showToast('No token — ask host to reshare link', 'error');
-    if (el) el.querySelector('.add-icon').textContent = '?';
-    return;
-  }
-  showStatus('✓ Token found (' + token.substring(0,8) + '...). Step 2: Finding song on Spotify...');
-
-  // Look up Spotify URI
+  // Look up URI if missing
   let uri = track.uri || null;
-  if (!uri) {
-    uri = await lookupSpotifyUri(track.name, track.artist, token);
+  if (!uri && guestState.spotifyToken) {
+    uri = await lookupUri(track.name, track.artist);
   }
 
-  if (!uri) {
-    // Still add to our queue display, just can't auto-play on Spotify
-    showStatus('⚠️ No Spotify URI found — adding to queue anyway', false);
-  } else {
-    showStatus('✓ Found URI. Adding to Spotify queue...');
-  }
+  guestState.submitted.push({ ...track, uri, submitter: guestState.name });
+  if (el) { el.classList.add('added'); el.querySelector('.add-icon').textContent = '✓'; }
+  renderMySubmissions();
 
-  const submission = { ...track, uri, submitter: guestState.name, submittedAt: Date.now() };
-  guestState.submitted.push(submission);
-  saveGuestState();
-
-  // Write URI→submitter mapping so host can show who picked each song
+  // Write to localStorage so host can read submitter name
   if (uri) {
     try {
-      // Write to jkbx_pending_ so host PC can read submitter names (same origin)
+      const whoKey = 'jkbx_who_' + guestState.code;
+      const who = JSON.parse(localStorage.getItem(whoKey) || '{}');
+      who[uri] = guestState.name;
+      localStorage.setItem(whoKey, JSON.stringify(who));
+
       const pendingKey = 'jkbx_pending_' + guestState.code;
       const pending = JSON.parse(localStorage.getItem(pendingKey) || '[]');
       if (!pending.find(t => t.uri === uri)) {
-        pending.push({ uri, name: guestState.name, submitter: guestState.name, 
-                       trackName: track.name, artist: track.artist });
+        pending.push({ uri, submitter: guestState.name, name: track.name, artist: track.artist });
         localStorage.setItem(pendingKey, JSON.stringify(pending));
       }
-      // Also write to jkbx_who_ map
-      const whoKey = 'jkbx_who_' + guestState.code;
-      const who = JSON.parse(localStorage.getItem(whoKey) || '{}');
-      who[uri] = guestState.name;
-      localStorage.setItem(whoKey, JSON.stringify(who));
     } catch(e) {}
   }
 
-  // Write URI→submitter mapping so host can show who picked each song
-  if (uri) {
+  // Add to Spotify queue
+  if (guestState.spotifyToken && uri) {
     try {
-      const whoKey = 'jkbx_who_' + guestState.code;
-      const who = JSON.parse(localStorage.getItem(whoKey) || '{}');
-      who[uri] = guestState.name;
-      localStorage.setItem(whoKey, JSON.stringify(who));
-    } catch(e) {}
-  }
-
-  // Write URI→submitter mapping so host can show who picked each song
-  if (uri) {
-    try {
-      const whoKey = 'jkbx_who_' + guestState.code;
-      const who = JSON.parse(localStorage.getItem(whoKey) || '{}');
-      who[uri] = guestState.name;
-      localStorage.setItem(whoKey, JSON.stringify(who));
-    } catch(e) {}
-  }
-  if (el) el.querySelector('.add-icon').textContent = '✓';
-  renderMySubmissions();
-
-  try {
-    const res = await fetch(`https://api.spotify.com/v1/me/player/queue?uri=${encodeURIComponent(uri)}`, {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + token }
-    });
-
-    if (res.status === 204 || res.status === 200) {
-      // 204 = success (No Content), 200 can also mean success for some Spotify versions
-      // Check if there's an error body
-      const text = await res.text();
-      if (text && text.includes('"error"')) {
-        const errData = JSON.parse(text);
-        const reason = errData?.error?.reason || errData?.error?.message || 'Unknown error';
-        if (reason === 'NO_ACTIVE_DEVICE') {
-          showStatus('❌ No active Spotify device — start playing music on your PC first', true);
-          showToast('Start playing Spotify on host PC first', 'error');
-        } else if (reason === 'PREMIUM_REQUIRED') {
-          showStatus('❌ Spotify Premium required', true);
-          showToast('Spotify Premium required', 'error');
-        } else {
-          showStatus('❌ Spotify: ' + reason, true);
-          showToast('Error: ' + reason, 'error');
-        }
-      } else {
-        // Success!
-        showStatus('✅ "' + track.name + '" added to Spotify queue!');
+      const res = await fetch('https://api.spotify.com/v1/me/player/queue?uri=' + encodeURIComponent(uri), {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + guestState.spotifyToken }
+      });
+      if (res.status === 204) {
         showToast('"' + track.name + '" added! 🎉', 'success');
-      }
-    } else {
-      const errData = await res.json().catch(() => ({}));
-      const reason = errData?.error?.reason || errData?.error?.message || ('HTTP ' + res.status);
-      if (reason === 'NO_ACTIVE_DEVICE') {
-        showStatus('❌ No active Spotify — start playing music on host PC first', true);
-        showToast('Start playing Spotify on host PC first', 'error');
       } else {
-        showStatus('❌ Spotify: ' + reason, true);
-        showToast('Error: ' + reason, 'error');
+        const err = await res.json().catch(() => ({}));
+        const reason = err?.error?.reason || ('HTTP ' + res.status);
+        if (reason === 'NO_ACTIVE_DEVICE') {
+          showToast('Host needs to start playing Spotify first', 'error');
+        } else {
+          showToast('"' + track.name + '" queued ✓', 'success');
+        }
       }
+    } catch(e) {
+      showToast('"' + track.name + '" saved ✓', 'success');
     }
-  } catch(e) {
-    showStatus('❌ Network error: ' + e.message, true);
-    showToast('Network error — try again', 'error');
-  }
-
-  if (guestState.submitted.length >= 3) {
-    document.getElementById('limitBanner').style.display = 'block';
+  } else {
+    showToast('"' + track.name + '" saved ✓', 'success');
   }
 }
 
-async function lookupSpotifyUri(name, artist, token) {
-  if (!token) return null;
+async function lookupUri(name, artist) {
   try {
-    // Strategy 1: exact track + artist search
-    let q = `track:${name} artist:${artist}`;
-    let res = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=1`, {
-      headers: { 'Authorization': 'Bearer ' + token }
+    const q = encodeURIComponent('track:' + name + ' artist:' + artist);
+    const res = await fetch('https://api.spotify.com/v1/search?q=' + q + '&type=track&limit=1', {
+      headers: { 'Authorization': 'Bearer ' + guestState.spotifyToken }
     });
-    let data = await res.json();
-    if (data?.tracks?.items?.[0]?.uri) return data.tracks.items[0].uri;
-
-    // Strategy 2: looser search — just name and artist as plain text
-    q = `${name} ${artist}`;
-    res = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=1`, {
-      headers: { 'Authorization': 'Bearer ' + token }
-    });
-    data = await res.json();
-    if (data?.tracks?.items?.[0]?.uri) return data.tracks.items[0].uri;
-
-    // Strategy 3: just the track name
-    res = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(name)}&type=track&limit=1`, {
-      headers: { 'Authorization': 'Bearer ' + token }
-    });
-    data = await res.json();
+    const data = await res.json();
     return data?.tracks?.items?.[0]?.uri || null;
   } catch(e) { return null; }
 }
 
+// ── MY SUBMISSIONS ────────────────────────────────────────────────────
 function renderMySubmissions() {
   const section = document.getElementById('mySongsSection');
   const list = document.getElementById('mySubmissions');
-
-  if (!guestState.submitted.length) {
-    section.style.display = 'none';
-    return;
-  }
-
+  if (!guestState.submitted.length) { section.style.display = 'none'; return; }
   section.style.display = 'block';
   list.innerHTML = guestState.submitted.map(t => `
     <div class="submitted-item">
-      <img class="submitted-art" src="${t.albumArt || ''}" alt="" onerror="this.style.background='var(--deep)'">
+      <img class="submitted-art" src="${esc(t.albumArt||'')}" alt="">
       <div class="submitted-info">
-        <div class="submitted-name">${escHtml(t.name)}</div>
-        <div class="submitted-artist">${escHtml(t.artist)}</div>
+        <div class="submitted-name">${esc(t.name)}</div>
+        <div class="submitted-artist">${esc(t.artist)}</div>
       </div>
       <span class="submitted-badge">QUEUED</span>
-    </div>
-  `).join('');
-}
-
-// ── GUEST STATE PERSISTENCE ─────────────────────────────────────────
-function saveGuestState() {
-  try {
-    localStorage.setItem('jkbx_guest_state', JSON.stringify({
-      code: guestState.code,
-      name: guestState.name,
-      partyName: guestState.partyName,
-      submitted: guestState.submitted,
-      spotifyToken: guestState.spotifyToken,
-      pasteId: guestState.pasteId
-    }));
-  } catch(e) {}
-}
-
-function loadGuestState() {
-  try {
-    const saved = localStorage.getItem('jkbx_guest_state');
-    if (!saved) return false;
-    const s = JSON.parse(saved);
-    const params = new URLSearchParams(window.location.search);
-    const urlCode = params.get('code');
-    if (urlCode && s.code !== urlCode) return false;
-    if (!s.code || !s.name) return false;
-    guestState.code = s.code;
-    guestState.name = s.name;
-    guestState.partyName = s.partyName || '';
-    guestState.submitted = s.submitted || [];
-    // NEVER restore old token from storage — always get fresh from URL
-    // (old token may be expired)
-    guestState.pasteId = s.pasteId || '';
-    return true;
-  } catch(e) { return false; }
+    </div>`).join('');
 }
 
 // ── TOAST ────────────────────────────────────────────────────────────
-function showStatus(msg, isError) {
-  // Debug logging only — no visible UI element
-  if (isError) console.warn('JKBX:', msg);
-  else console.log('JKBX:', msg);
-}
-
 let toastTimer;
 function showToast(msg, type) {
   const el = document.getElementById('toast');
   el.textContent = msg;
-  el.className = `toast show ${type}`;
+  el.className = 'toast show ' + (type || '');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
 }
 
 // ── UTILS ────────────────────────────────────────────────────────────
-function formatDuration(ms) {
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function fmt(ms) {
   if (!ms) return '';
-  const s = Math.floor(ms / 1000);
-  return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+  const s = Math.floor(ms/1000);
+  return Math.floor(s/60) + ':' + String(s%60).padStart(2,'0');
 }
 
-function escHtml(str) {
-  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
 </script>
 </body>
 </html>
