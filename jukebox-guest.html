@@ -881,57 +881,64 @@ async function addTrack(track) {
     return;
   }
 
-  // Optimistically update UI
   const el = document.getElementById('ri-' + track.id);
   if (el) { el.classList.add('added'); el.querySelector('.add-icon').textContent = '⏳'; }
 
-  // Get token (may need to fetch from dpaste)
+  showStatus('Step 1: Getting Spotify token...');
+
+  // Get token
   let token = guestState.spotifyToken || '';
   if (!token || token.length < 20) {
     token = await fetchPartyToken();
     if (token) guestState.spotifyToken = token;
   }
 
-  // If we have a token but no URI, search Spotify for the track URI first
+  if (!token || token.length < 20) {
+    showStatus('❌ No Spotify token found. Ask host to re-share the invite link.', true);
+    showToast('No token — ask host to reshare link', 'error');
+    if (el) el.querySelector('.add-icon').textContent = '?';
+    return;
+  }
+  showStatus('✓ Token found (' + token.substring(0,8) + '...). Step 2: Finding song on Spotify...');
+
+  // Look up Spotify URI
   let uri = track.uri || null;
-  if (token && !uri) {
+  if (!uri) {
     uri = await lookupSpotifyUri(track.name, track.artist, token);
   }
+
+  if (!uri) {
+    showStatus('❌ Could not find "' + track.name + '" on Spotify.', true);
+    showToast('Song not found on Spotify', 'error');
+    if (el) el.querySelector('.add-icon').textContent = '✗';
+    return;
+  }
+  showStatus('✓ Found URI. Step 3: Adding to Spotify queue...');
 
   const submission = { ...track, uri, submitter: guestState.name, submittedAt: Date.now() };
   guestState.submitted.push(submission);
   saveGuestState();
-
-  if (el) { el.querySelector('.add-icon').textContent = '✓'; }
+  if (el) el.querySelector('.add-icon').textContent = '✓';
   renderMySubmissions();
 
-  let addedToSpotify = false;
-  if (token && uri) {
-    try {
-      const res = await fetch(`https://api.spotify.com/v1/me/player/queue?uri=${encodeURIComponent(uri)}`, {
-        method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + token }
-      });
-      if (res.status === 204 || res.ok) {
-        addedToSpotify = true;
-        showToast(`"${track.name}" added to queue! 🎉`, 'success');
-      } else {
-        const errData = await res.json().catch(() => ({}));
-        if (errData?.error?.reason === 'PREMIUM_REQUIRED') {
-          showToast('Spotify Premium required on host device', 'error');
-        } else if (errData?.error?.reason === 'NO_ACTIVE_DEVICE') {
-          showToast('Host needs to start playing Spotify first', 'error');
-        } else {
-          showToast(`"${track.name}" queued ✓`, 'success');
-        }
-      }
-    } catch(e) {
-      console.log('Spotify queue error:', e);
-    }
-  }
+  try {
+    const res = await fetch(`https://api.spotify.com/v1/me/player/queue?uri=${encodeURIComponent(uri)}`, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
 
-  if (!addedToSpotify && !token) {
-    showToast(`"${track.name}" saved ✓`, 'success');
+    if (res.status === 204) {
+      showStatus('✅ "' + track.name + '" added to Spotify queue!');
+      showToast('"' + track.name + '" added to queue! 🎉', 'success');
+    } else {
+      const errData = await res.json().catch(() => ({}));
+      const reason = errData?.error?.reason || errData?.error?.message || ('HTTP ' + res.status);
+      showStatus('❌ Spotify error: ' + reason, true);
+      showToast('Spotify error: ' + reason, 'error');
+    }
+  } catch(e) {
+    showStatus('❌ Network error: ' + e.message, true);
+    showToast('Network error — try again', 'error');
   }
 
   if (guestState.submitted.length >= 3) {
@@ -1007,6 +1014,21 @@ function loadGuestState() {
 }
 
 // ── TOAST ────────────────────────────────────────────────────────────
+function showStatus(msg, isError) {
+  let bar = document.getElementById('statusBar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'statusBar';
+    bar.style.cssText = 'position:fixed;top:70px;left:0;right:0;background:#18181f;border-bottom:1px solid #2a2a35;padding:10px 20px;font-family:monospace;font-size:0.72rem;z-index:500;word-break:break-all;line-height:1.5;';
+    document.body.appendChild(bar);
+  }
+  bar.style.color = isError ? '#e84040' : '#1DB954';
+  bar.textContent = msg;
+  // Auto-hide after 8 seconds
+  clearTimeout(bar._timer);
+  bar._timer = setTimeout(() => { if(bar) bar.remove(); }, 8000);
+}
+
 let toastTimer;
 function showToast(msg, type) {
   const el = document.getElementById('toast');
