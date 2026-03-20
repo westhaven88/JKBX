@@ -919,14 +919,38 @@ async function addTrack(track) {
       headers: { 'Authorization': 'Bearer ' + token }
     });
 
-    if (res.status === 204) {
-      showStatus('✅ "' + track.name + '" added to Spotify queue!');
-      showToast('"' + track.name + '" added to queue! 🎉', 'success');
+    if (res.status === 204 || res.status === 200) {
+      // 204 = success (No Content), 200 can also mean success for some Spotify versions
+      // Check if there's an error body
+      const text = await res.text();
+      if (text && text.includes('"error"')) {
+        const errData = JSON.parse(text);
+        const reason = errData?.error?.reason || errData?.error?.message || 'Unknown error';
+        if (reason === 'NO_ACTIVE_DEVICE') {
+          showStatus('❌ No active Spotify device — start playing music on your PC first', true);
+          showToast('Start playing Spotify on host PC first', 'error');
+        } else if (reason === 'PREMIUM_REQUIRED') {
+          showStatus('❌ Spotify Premium required', true);
+          showToast('Spotify Premium required', 'error');
+        } else {
+          showStatus('❌ Spotify: ' + reason, true);
+          showToast('Error: ' + reason, 'error');
+        }
+      } else {
+        // Success!
+        showStatus('✅ "' + track.name + '" added to Spotify queue!');
+        showToast('"' + track.name + '" added! 🎉', 'success');
+      }
     } else {
       const errData = await res.json().catch(() => ({}));
       const reason = errData?.error?.reason || errData?.error?.message || ('HTTP ' + res.status);
-      showStatus('❌ Spotify error: ' + reason, true);
-      showToast('Spotify error: ' + reason, 'error');
+      if (reason === 'NO_ACTIVE_DEVICE') {
+        showStatus('❌ No active Spotify — start playing music on host PC first', true);
+        showToast('Start playing Spotify on host PC first', 'error');
+      } else {
+        showStatus('❌ Spotify: ' + reason, true);
+        showToast('Error: ' + reason, 'error');
+      }
     }
   } catch(e) {
     showStatus('❌ Network error: ' + e.message, true);
