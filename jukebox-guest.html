@@ -709,27 +709,16 @@ async function searchSpotify(query) {
 }
 
 async function fetchPartyToken() {
-  // Token comes from URL param 't' (same device) or dpaste ID 'd' (other devices)
+  // Token is in URL param 't' — read it directly, no external service needed
   if (guestState.spotifyToken && guestState.spotifyToken.length > 20) {
     return guestState.spotifyToken;
   }
-
-  // Try fetching from dpaste using the 'd' param in the URL
+  // Try reading fresh from current URL (in case state was restored without token)
   const params = new URLSearchParams(window.location.search);
-  const pasteId = params.get('d');
-  if (!pasteId) return '';
-
-  try {
-    const res = await fetch(`https://dpaste.org/${pasteId}.txt`);
-    if (!res.ok) return '';
-    const text = await res.text();
-    const data = JSON.parse(text.trim());
-    if (data.token && data.token.length > 20) {
-      guestState.spotifyToken = data.token;
-      return data.token;
-    }
-  } catch(e) {
-    console.log('dpaste fetch error:', e);
+  const t = params.get('t');
+  if (t && t.length > 20) {
+    guestState.spotifyToken = t;
+    return t;
   }
   return '';
 }
@@ -834,7 +823,7 @@ async function searchViaMusicBrainz(query) {
     document.getElementById('searchResults').innerHTML = `
       <div class="hint" style="color:var(--red);">
         <span class="hint-icon">⚠️</span>
-        Search unavailable.<br>Ask the host to open the party page first,<br>then try again.
+        Search unavailable.<br>Try scanning the QR code again from the host screen.
       </div>`;
   }
 }
