@@ -212,7 +212,14 @@
 
   .dash-top {
     display: grid;
-    grid-template-columns: 340px 1fr 1fr;
+    grid-template-columns: 300px 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+
+  .dash-top-right {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 20px;
     align-items: start;
   }
@@ -906,13 +913,22 @@
   }
   .share-close-btn:hover { border-color: var(--text); color: var(--text); }
 
+  .dash-top-right > .panel {
+    height: 100%;
+  }
+
+  @media (max-width: 1100px) {
+    .dash-top { grid-template-columns: 260px 1fr; }
+  }
   @media (max-width: 900px) {
     .dash-top { grid-template-columns: 1fr; }
+    .dash-top-right { grid-template-columns: 1fr 1fr; }
     .topbar { padding: 16px 20px; }
     #dashScreen { padding: 16px; }
   }
   @media (max-width: 600px) {
     .dash-top { grid-template-columns: 1fr; }
+    .dash-top-right { grid-template-columns: 1fr; }
     #dashScreen { padding: 12px; gap: 12px; }
     .party-code-display { font-size: 2.8rem; }
   }
@@ -1026,10 +1042,10 @@
 <!-- DASHBOARD SCREEN -->
 <div id="dashScreen" class="screen">
 
-  <!-- TOP ROW: Party Code | Now Playing | Stats -->
+  <!-- TOP ROW: Party Code (left) | Now Playing + Stats (right) -->
   <div class="dash-top">
 
-    <!-- Party Code (far left) -->
+    <!-- Party Code (left column) -->
     <div class="panel">
       <div class="panel-label">Party Code</div>
       <div class="party-code-display" id="partyCodeDisplay">——</div>
@@ -1040,52 +1056,57 @@
       <button class="copy-btn" id="copyBtn" onclick="copyLink()">🎉 Invite Guests</button>
     </div>
 
-    <!-- Now Playing (center) -->
-    <div class="panel">
-      <div class="panel-label">Now Playing</div>
-      <div style="display:flex; gap:14px; align-items:center; margin-bottom:12px;">
-        <img id="npArt" class="now-playing-art" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3Crect fill='%2318181f'/%3E%3C/svg%3E" alt="album art" style="width:64px;height:64px;flex-shrink:0;">
-        <div style="min-width:0;">
-          <div class="np-title" id="npTitle">—</div>
-          <div class="np-artist" id="npArtist">No track playing</div>
-        </div>
-      </div>
-      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
-      <div class="controls">
-        <button class="ctrl-btn" onclick="spotifyPrev()" title="Previous">⏮</button>
-        <button class="ctrl-btn primary" id="playPauseBtn" onclick="togglePlay()">▶</button>
-        <button class="ctrl-btn" onclick="spotifyNext()" title="Next">⏭</button>
-      </div>
-      <div class="playback-status" style="margin-top:12px;">
-        <div class="dot" id="statusDot"></div>
-        <span id="statusText">Not connected</span>
-      </div>
-    </div>
+    <!-- Now Playing + Stats (right column, side by side, equal height) -->
+    <div class="dash-top-right">
 
-    <!-- Party Stats (right) -->
-    <div class="panel">
-      <div class="panel-label">Party Stats</div>
-      <div class="stats-grid">
-        <div class="stat">
-          <div class="stat-val" id="statSongs">0</div>
-          <div class="stat-label">Songs</div>
+      <!-- Now Playing -->
+      <div class="panel" style="display:flex; flex-direction:column;">
+        <div class="panel-label">Now Playing</div>
+        <div style="display:flex; gap:14px; align-items:center; margin-bottom:12px;">
+          <img id="npArt" class="now-playing-art" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3Crect fill='%2318181f'/%3E%3C/svg%3E" alt="album art" style="width:64px;height:64px;flex-shrink:0;">
+          <div style="min-width:0;">
+            <div class="np-title" id="npTitle">—</div>
+            <div class="np-artist" id="npArtist">No track playing</div>
+          </div>
         </div>
-        <div class="stat">
-          <div class="stat-val" id="statGuests">0</div>
-          <div class="stat-label">Guests</div>
+        <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="controls">
+          <button class="ctrl-btn" onclick="spotifyPrev()" title="Previous">⏮</button>
+          <button class="ctrl-btn primary" id="playPauseBtn" onclick="togglePlay()">▶</button>
+          <button class="ctrl-btn" onclick="spotifyNext()" title="Next">⏭</button>
         </div>
-        <div class="stat">
-          <div class="stat-val" id="statPlayed">0</div>
-          <div class="stat-label">Played</div>
-        </div>
-        <div class="stat">
-          <div class="stat-val" id="statTime">0m</div>
-          <div class="stat-label">Queue</div>
+        <div class="playback-status" style="margin-top:12px;">
+          <div class="dot" id="statusDot"></div>
+          <span id="statusText">Not connected</span>
         </div>
       </div>
-    </div>
 
-  </div>
+      <!-- Party Stats -->
+      <div class="panel" style="display:flex; flex-direction:column;">
+        <div class="panel-label">Party Stats</div>
+        <div class="stats-grid" style="flex:1;">
+          <div class="stat">
+            <div class="stat-val" id="statSongs">0</div>
+            <div class="stat-label">Songs</div>
+          </div>
+          <div class="stat">
+            <div class="stat-val" id="statGuests">0</div>
+            <div class="stat-label">Guests</div>
+          </div>
+          <div class="stat">
+            <div class="stat-val" id="statPlayed">0</div>
+            <div class="stat-label">Played</div>
+          </div>
+          <div class="stat">
+            <div class="stat-val" id="statTime">0m</div>
+            <div class="stat-label">Queue</div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- end dash-top-right -->
+
+  </div><!-- end dash-top -->
 
   <!-- BOTTOM: Full-width Queue -->
   <div class="dash-bottom">
