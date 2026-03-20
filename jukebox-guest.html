@@ -728,7 +728,7 @@ async function fetchPartyToken() {
 
 async function searchViaSpotify(query, token) {
   try {
-    const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=8`;
+    const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=20`;
     const res = await fetch(url, {
       headers: { 'Authorization': 'Bearer ' + token }
     });
@@ -748,7 +748,7 @@ async function searchViaSpotify(query, token) {
       return;
     }
 
-    const tracks = items.map(t => ({
+    const tracks = items.slice(0, 20).map(t => ({
       id: t.id,
       name: t.name,
       artist: t.artists.map(a => a.name).join(', '),
@@ -778,7 +778,7 @@ async function searchViaMusicBrainz(query) {
     let recordings = [];
     if (artistId) {
       // Get top recordings by this artist
-      const recUrl = `https://musicbrainz.org/ws/2/recording/?query=arid:${artistId}&limit=12&fmt=json`;
+      const recUrl = `https://musicbrainz.org/ws/2/recording/?query=arid:${artistId}&limit=20&fmt=json`;
       const recRes = await fetch(recUrl, {
         headers: { 'User-Agent': 'JKBX-Party-App/1.0 (https://westhaven88.github.io/JKBX)' }
       });
@@ -788,7 +788,7 @@ async function searchViaMusicBrainz(query) {
 
     // Fallback: search by title if no artist found
     if (!recordings.length) {
-      const url = `https://musicbrainz.org/ws/2/recording/?query=${encodeURIComponent(query)}&limit=10&fmt=json`;
+      const url = `https://musicbrainz.org/ws/2/recording/?query=${encodeURIComponent(query)}&limit=20&fmt=json`;
       const res2 = await fetch(url, {
         headers: { 'User-Agent': 'JKBX-Party-App/1.0 (https://westhaven88.github.io/JKBX)' }
       });
@@ -806,7 +806,7 @@ async function searchViaMusicBrainz(query) {
     const seen = new Set();
     const tracks = recordings
       .filter(r => { const key = r.title.toLowerCase(); if (seen.has(key)) return false; seen.add(key); return true; })
-      .slice(0, 8)
+      .slice(0, 20)
       .map((r, i) => {
         const artist = r['artist-credit']?.[0]?.artist?.name || r['artist-credit']?.[0]?.name || 'Unknown';
         const release = r.releases?.[0];
