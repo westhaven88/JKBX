@@ -1578,9 +1578,16 @@ async function pollSpotifyQueue() {
   const upNext = queueData.queue || [];
   const nowPlayingUri = state.currentTrack?.uri || '';
 
-  // Preserve submitter names
+  // Build submitter map: first from our persistent localStorage record,
+  // then overlay with any names already in state.queue
   const submitterMap = {};
-  state.queue.forEach(q => { if (q.uri && q.submitter !== '♫') submitterMap[q.uri] = q.submitter; });
+  try {
+    const whoKey = 'jkbx_who_' + state.partyCode;
+    const stored = JSON.parse(localStorage.getItem(whoKey) || '{}');
+    Object.assign(submitterMap, stored);
+  } catch(e) {}
+  // Also preserve any names already in current queue display
+  state.queue.forEach(q => { if (q.uri && q.submitter && q.submitter !== '♫') submitterMap[q.uri] = q.submitter; });
 
   // Deduplicate by URI and filter out currently-playing track
   const seenUris = new Set();
@@ -1597,7 +1604,7 @@ async function pollSpotifyQueue() {
       albumArt: t.album?.images?.[1]?.url || t.album?.images?.[0]?.url || '',
       uri: t.uri,
       duration: t.duration_ms,
-      submitter: submitterMap[t.uri] || '♫'
+      submitter: submitterMap[t.uri] || ''
     });
     if (newQueue.length >= 15) break;
   }
@@ -1627,9 +1634,14 @@ function checkGuestSubmissions() {
     const tracks = JSON.parse(pending);
       tracks.forEach(track => {
       if (track.submitter) state.guestCount.add(track.submitter);
-      // Add to Spotify queue — the queue display will sync via pollSpotifyQueue
       if (track.uri && state.accessToken) addToSpotifyQueue(track.uri);
     });
+    // Also count guests from the who map
+    try {
+      const whoKey = 'jkbx_who_' + state.partyCode;
+      const who = JSON.parse(localStorage.getItem(whoKey) || '{}');
+      Object.values(who).forEach(name => state.guestCount.add(name));
+    } catch(e) {}
     // Don't manually add to state.queue — pollSpotifyQueue will sync it
   } catch(e) { console.log('checkGuestSubmissions error:', e); }
 }
