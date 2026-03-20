@@ -1374,13 +1374,10 @@ function setupPartyCode() {
   const guestUrl = cleanBase.replace('jukebox-host.html', 'jukebox-guest.html');
   const tok = state.accessToken || localStorage.getItem('jkbx_token') || '';
 
-  // Publish token to dpaste.org so guests get it via a short ID (keeps QR scannable)
-  state.guestLinkShort = `${guestUrl}?code=${state.partyCode}&party=${encodeURIComponent(config.partyName)}`;
-  state.guestLink = state.guestLinkShort;
-
-  if (tok) {
-    publishTokenToDpaste(tok, state.partyCode);
-  }
+  // Token goes directly in URL - QR is shown large enough to scan
+  const baseLink = `${guestUrl}?code=${state.partyCode}&party=${encodeURIComponent(config.partyName)}`;
+  state.guestLinkShort = baseLink;
+  state.guestLink = tok ? `${baseLink}&t=${tok}` : baseLink;
 
   document.getElementById('partyCodeDisplay').textContent = state.partyCode;
   document.getElementById('guestLink').textContent = state.guestLink;
@@ -1602,8 +1599,10 @@ function shareParty() {
   // QR code
   const qrEl = document.getElementById('shareQR');
   const shortLink = state.guestLinkShort || link;
-  if (shortLink) {
-    qrEl.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&ecc=L&data=${encodeURIComponent(shortLink)}" style="border-radius:6px;" width="200" height="200" alt="QR">`;
+  // Use full link with token for modal QR too
+  const qrLink = state.guestLink || shortLink;
+  if (qrLink) {
+    qrEl.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&ecc=L&data=${encodeURIComponent(qrLink)}" style="border-radius:6px;width:100%;max-width:260px;display:block;margin:0 auto;" alt="QR">`;
   }
 
   modal.classList.add('visible');
@@ -1650,68 +1649,6 @@ function shareAction(type) {
 // Also update the existing copyLink to use shareParty
 function copyLink() {
   shareParty();
-}
-
-// ── TOKEN SHARING ───────────────────────────────────────────────────
-async function publishTokenToDpaste(token, code) {
-  try {
-    // Check if we already have a valid dpaste ID stored
-    const existing = localStorage.getItem('jkbx_dpaste_' + code);
-    if (existing) {
-      // Just update the content by creating a new paste
-      // (dpaste doesn't support updates, so we create a new one and store the new ID)
-    }
-
-    const formData = new FormData();
-    formData.append('content', JSON.stringify({ token, code, ts: Date.now() }));
-    formData.append('syntax', 'json');
-    formData.append('expiry_days', '1');
-
-    const res = await fetch('https://dpaste.org/api/', {
-      method: 'POST',
-      body: formData
-    });
-
-    if (res.ok) {
-      const url = await res.text(); // returns URL like https://dpaste.org/ABCD
-      const pasteId = url.trim().replace('https://dpaste.org/', '').replace(/\/+$/, '');
-      localStorage.setItem('jkbx_dpaste_' + code, pasteId);
-
-      // Update guest links with the paste ID
-      const cleanBase = window.location.origin + window.location.pathname;
-      const guestUrl = cleanBase.replace('jukebox-host.html', 'jukebox-guest.html');
-      state.guestLinkShort = `${guestUrl}?code=${state.partyCode}&party=${encodeURIComponent(config.partyName)}&d=${pasteId}`;
-      state.guestLink = state.guestLinkShort;
-
-      // Refresh the QR code and link displays
-      updateQRDisplays();
-    }
-  } catch(e) {
-    console.log('dpaste error:', e);
-  }
-}
-
-function updateQRDisplays() {
-  const link = state.guestLinkShort;
-  if (!link) return;
-
-  // Update sidebar QR
-  const qrEl = document.getElementById('qrCode');
-  if (qrEl) {
-    qrEl.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&ecc=L&data=${encodeURIComponent(link)}" style="border-radius:4px;" width="180" height="180" alt="QR Code">`;
-  }
-
-  // Update sidebar link text
-  const linkEl = document.getElementById('guestLink');
-  if (linkEl) linkEl.textContent = link;
-
-  // Update share modal if open
-  const shareQR = document.getElementById('shareQR');
-  if (shareQR) {
-    shareQR.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&ecc=L&data=${encodeURIComponent(link)}" style="border-radius:6px;" width="200" height="200" alt="QR">`;
-  }
-  const shareLinkBox = document.getElementById('shareLinkBox');
-  if (shareLinkBox) shareLinkBox.textContent = link;
 }
 
 // ── UTILS ────────────────────────────────────────────────────────────
