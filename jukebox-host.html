@@ -637,8 +637,8 @@
   }
 
   .qr-placeholder {
-    width: 120px;
-    height: 120px;
+    width: 100%;
+    min-height: 160px;
     background: var(--border);
     border-radius: 4px;
     display: flex;
@@ -1602,7 +1602,7 @@ function shareParty() {
   // Use full link with token for modal QR too
   const qrLink = state.guestLink || shortLink;
   if (qrLink) {
-    qrEl.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=400x400&ecc=L&data=${encodeURIComponent(qrLink)}" style="border-radius:6px;width:100%;display:block;" alt="QR">`;
+    qrEl.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=500x500&ecc=L&data=${encodeURIComponent(qrLink)}" style="border-radius:6px;width:100%;display:block;" alt="QR">`;
   }
 
   modal.classList.add('visible');
