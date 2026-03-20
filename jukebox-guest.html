@@ -499,6 +499,7 @@
     <strong id="headerPartyName">Loading...</strong>
     <span id="headerCode">—</span>
   </div>
+  <div id="tokenIndicator" style="font-family:monospace;font-size:0.6rem;color:#6b6b80;padding:4px 8px;"></div>
 </div>
 
 <!-- JOIN SCREEN -->
@@ -577,23 +578,41 @@ window.onload = () => {
   const party = params.get('party');
   const tokenParam = params.get('t');
 
-  // If URL has a fresh token, clear ALL old saved state and start clean
-  // This ensures stale names like "Rob8" don't persist
+  // ALWAYS read token fresh from URL - never use cached token
+  // Store it in sessionStorage only (cleared when tab closes)
   if (tokenParam && tokenParam.length > 20) {
-    localStorage.removeItem('jkbx_guest_state');
+    sessionStorage.setItem('jkbx_token', tokenParam);
     guestState.spotifyToken = tokenParam;
+  } else {
+    // Try sessionStorage (same tab refresh)
+    const sessToken = sessionStorage.getItem('jkbx_token');
+    if (sessToken && sessToken.length > 20) {
+      guestState.spotifyToken = sessToken;
+    }
   }
 
-  // Restore saved state only if no fresh token in URL
-  if (!tokenParam && loadGuestState()) {
-    if (code) guestState.code = code;
-    if (party) guestState.partyName = decodeURIComponent(party);
-    document.getElementById('headerCode').textContent = guestState.code;
-    document.getElementById('headerPartyName').textContent = guestState.partyName || 'Party';
+  // Set code and party from URL
+  if (code) {
+    guestState.code = code;
+    guestState.partyName = party ? decodeURIComponent(party) : 'Party';
+  }
+
+  // Update header
+  document.getElementById('headerCode').textContent = guestState.code || '—';
+  document.getElementById('headerPartyName').textContent = guestState.partyName || 'Party';
+
+  // If we have a saved name for this code, auto-show search
+  const savedName = localStorage.getItem('jkbx_name_' + guestState.code);
+  if (savedName && guestState.code) {
+    guestState.name = savedName;
     showSearch();
     renderMySubmissions();
     return;
   }
+
+  // Pre-fill name field with last used name
+  const anyName = localStorage.getItem('jkbx_guest_name');
+  if (anyName) document.getElementById('nameInput').value = anyName;
 
   // Load host config for Spotify client ID
   const savedConfig = localStorage.getItem('jkbx_config');
@@ -642,6 +661,7 @@ function joinParty() {
   guestState.code = code;
   guestState.name = name;
   localStorage.setItem('jkbx_guest_name', name);
+  localStorage.setItem('jkbx_name_' + code, name);
   saveGuestState();
   showSearch();
 }
@@ -707,19 +727,23 @@ async function searchSpotify(query) {
 }
 
 async function fetchPartyToken() {
-  // 1. Check memory first
+  // 1. Check memory
   if (guestState.spotifyToken && guestState.spotifyToken.length > 20) {
     return guestState.spotifyToken;
   }
-  // 2. Read from current URL — the token is embedded as &t=
-  const params = new URLSearchParams(window.location.search);
-  const t = params.get('t');
+  // 2. Check sessionStorage (survives refresh, not tab close)
+  const sess = sessionStorage.getItem('jkbx_token');
+  if (sess && sess.length > 20) {
+    guestState.spotifyToken = sess;
+    return sess;
+  }
+  // 3. Check URL
+  const t = new URLSearchParams(window.location.search).get('t');
   if (t && t.length > 20) {
     guestState.spotifyToken = t;
-    saveGuestState();
+    sessionStorage.setItem('jkbx_token', t);
     return t;
   }
-  // 3. No token available
   return '';
 }
 
