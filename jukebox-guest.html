@@ -915,6 +915,15 @@ async function addTrack(track) {
   // Write URI→submitter mapping so host can show who picked each song
   if (uri) {
     try {
+      // Write to jkbx_pending_ so host PC can read submitter names (same origin)
+      const pendingKey = 'jkbx_pending_' + guestState.code;
+      const pending = JSON.parse(localStorage.getItem(pendingKey) || '[]');
+      if (!pending.find(t => t.uri === uri)) {
+        pending.push({ uri, name: guestState.name, submitter: guestState.name, 
+                       trackName: track.name, artist: track.artist });
+        localStorage.setItem(pendingKey, JSON.stringify(pending));
+      }
+      // Also write to jkbx_who_ map
       const whoKey = 'jkbx_who_' + guestState.code;
       const who = JSON.parse(localStorage.getItem(whoKey) || '{}');
       who[uri] = guestState.name;
