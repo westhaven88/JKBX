@@ -300,10 +300,14 @@
 
   .track-submitter {
     font-family: 'DM Mono', monospace;
-    font-size: 0.68rem;
+    font-size: 0.72rem;
     color: var(--amber-dim);
     letter-spacing: 0.04em;
     flex-shrink: 0;
+    background: rgba(245,166,35,0.08);
+    padding: 2px 8px;
+    border-radius: 20px;
+    border: 1px solid rgba(245,166,35,0.15);
   }
 
   .remove-btn {
@@ -416,21 +420,26 @@
   /* Party Code */
   .party-code-display {
     font-family: 'Bebas Neue', sans-serif;
-    font-size: 3.5rem;
+    font-size: 3rem;
     letter-spacing: 0.2em;
     color: var(--amber);
     text-align: center;
     text-shadow: 0 0 20px rgba(245,166,35,0.3);
-    margin: 8px 0;
+    margin: 6px 0;
   }
 
   .party-link {
     font-family: 'DM Mono', monospace;
-    font-size: 0.78rem;
+    font-size: 0.72rem;
     color: var(--muted);
     text-align: center;
     word-break: break-all;
-    margin-top: 8px;
+    margin-top: 6px;
+    padding: 6px 8px;
+    background: var(--deep);
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    line-height: 1.5;
   }
 
   .copy-btn {
@@ -1380,7 +1389,8 @@ function setupPartyCode() {
   state.guestLink = tok ? `${baseLink}&t=${tok}` : baseLink;
 
   document.getElementById('partyCodeDisplay').textContent = state.partyCode;
-  document.getElementById('guestLink').textContent = state.guestLink;
+  const displayUrl = state.guestLinkShort.replace('https://', '');
+  document.getElementById('guestLink').textContent = displayUrl;
 
   // Generate simple QR using a free API
   const qrEl = document.getElementById('qrCode');
@@ -1636,7 +1646,9 @@ function shareParty() {
   const partyName = config.partyName || 'Party';
 
   document.getElementById('shareCodeBig').textContent = code;
-  document.getElementById('shareLinkBox').textContent = state.guestLinkShort || link;
+  // Show clean URL without token in the display box
+  const shortDisplay = (state.guestLinkShort || link).replace('https://', '');
+  document.getElementById('shareLinkBox').textContent = shortDisplay;
   document.getElementById('sharePartyLabel').textContent = partyName + ' — scan QR or share link';
 
   // QR code
@@ -1645,7 +1657,7 @@ function shareParty() {
   // Use full link with token for modal QR too
   const qrLink = state.guestLink || shortLink;
   if (qrLink) {
-    qrEl.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=500x500&ecc=L&data=${encodeURIComponent(qrLink)}" style="border-radius:6px;width:100%;display:block;" alt="QR">`;
+    qrEl.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=400x400&ecc=L&data=${encodeURIComponent(qrLink)}&bgcolor=ffffff&color=0a0a0a&margin=2" style="border-radius:8px;width:100%;display:block;" alt="QR">`;
   }
 
   modal.classList.add('visible');
