@@ -632,7 +632,7 @@
     justify-content: center;
     background: var(--deep);
     border-radius: 6px;
-    padding: 16px;
+    padding: 8px;
     margin-top: 12px;
   }
 
@@ -1602,7 +1602,7 @@ function shareParty() {
   // Use full link with token for modal QR too
   const qrLink = state.guestLink || shortLink;
   if (qrLink) {
-    qrEl.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&ecc=L&data=${encodeURIComponent(qrLink)}" style="border-radius:6px;width:100%;max-width:260px;display:block;margin:0 auto;" alt="QR">`;
+    qrEl.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=400x400&ecc=L&data=${encodeURIComponent(qrLink)}" style="border-radius:6px;width:100%;display:block;" alt="QR">`;
   }
 
   modal.classList.add('visible');
@@ -1703,7 +1703,7 @@ function escHtml(str) {
     <div class="share-modal-sub" id="sharePartyLabel">Share this code or link with your guests</div>
     <div class="share-code-big" id="shareCodeBig">——</div>
     <div class="share-qr">
-      <div id="shareQR" style="width:140px;height:140px;background:var(--deep);border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:0.7rem;font-family:monospace;">Loading...</div>
+      <div id="shareQR" style="width:100%;background:var(--deep);border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:0.7rem;font-family:monospace;min-height:100px;">Loading...</div>
     </div>
     <div class="share-link-box" id="shareLinkBox">—</div>
     <div class="share-actions">
