@@ -609,15 +609,8 @@ window.onload = () => {
     } catch(e) {}
   }
 
-  // Get Spotify token — from URL param 't' (same device) or dpaste 'd' (other device)
-  const tokenParam = params.get('t');
-  const pasteParam = params.get('d');
-  if (tokenParam && tokenParam.length > 20) {
-    guestState.spotifyToken = tokenParam;
-  } else if (pasteParam) {
-    guestState.pasteId = pasteParam;
-    // Token will be fetched lazily when search is triggered
-  } else {
+  // Token already handled above — just set fallback if nothing found yet
+  if (!guestState.spotifyToken) {
     guestState.spotifyToken = localStorage.getItem('jkbx_token') || '';
   }
 
