@@ -576,6 +576,22 @@ window.onload = () => {
   const code = params.get('code');
   const party = params.get('party');
 
+  // Restore saved guest state (phone woke up, tab refreshed, etc.)
+  if (loadGuestState()) {
+    // Update token from URL if fresher one is present
+    const tokenParam = params.get('t');
+    const pasteParam = params.get('d');
+    if (tokenParam && tokenParam.length > 20) guestState.spotifyToken = tokenParam;
+    if (pasteParam) guestState.pasteId = pasteParam;
+    if (code) guestState.code = code;
+    if (party) guestState.partyName = decodeURIComponent(party);
+    document.getElementById('headerCode').textContent = guestState.code;
+    document.getElementById('headerPartyName').textContent = guestState.partyName || 'Party';
+    showSearch();
+    renderMySubmissions();
+    return;
+  }
+
   // Load host config for Spotify client ID
   const savedConfig = localStorage.getItem('jkbx_config');
   if (savedConfig) {
@@ -630,6 +646,7 @@ function joinParty() {
   guestState.code = code;
   guestState.name = name;
   localStorage.setItem('jkbx_guest_name', name);
+  saveGuestState();
   showSearch();
 }
 
@@ -859,73 +876,78 @@ function renderResults(tracks) {
 
 // ── ADD TRACK ────────────────────────────────────────────────────────
 async function addTrack(track) {
-  // Check if already added
   if (guestState.submitted.find(t => t.id === track.id)) {
     showToast('Already added!', '');
     return;
   }
 
-  const submission = {
-    ...track,
-    submitter: guestState.name,
-    submittedAt: Date.now()
-  };
-
-  // Optimistically update UI immediately
-  guestState.submitted.push(submission);
+  // Optimistically update UI
   const el = document.getElementById('ri-' + track.id);
-  if (el) {
-    el.classList.add('added');
-    el.querySelector('.add-icon').textContent = '✓';
+  if (el) { el.classList.add('added'); el.querySelector('.add-icon').textContent = '⏳'; }
+
+  // Get token (may need to fetch from dpaste)
+  let token = guestState.spotifyToken || '';
+  if (!token || token.length < 20) {
+    token = await fetchPartyToken();
+    if (token) guestState.spotifyToken = token;
   }
+
+  // If we have a token but no URI, search Spotify for the track URI first
+  let uri = track.uri || null;
+  if (token && !uri) {
+    uri = await lookupSpotifyUri(track.name, track.artist, token);
+  }
+
+  const submission = { ...track, uri, submitter: guestState.name, submittedAt: Date.now() };
+  guestState.submitted.push(submission);
+  saveGuestState();
+
+  if (el) { el.querySelector('.add-icon').textContent = '✓'; }
   renderMySubmissions();
 
   let addedToSpotify = false;
-
-  // Try adding directly to Spotify queue using the token from URL
-  const token = guestState.spotifyToken;
-  if (token && track.uri) {
+  if (token && uri) {
     try {
-      const res = await fetch(`https://api.spotify.com/v1/me/player/queue?uri=${encodeURIComponent(track.uri)}`, {
+      const res = await fetch(`https://api.spotify.com/v1/me/player/queue?uri=${encodeURIComponent(uri)}`, {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + token }
       });
       if (res.status === 204 || res.ok) {
         addedToSpotify = true;
-        showToast(`"${track.name}" added to Spotify! 🎉`, 'success');
+        showToast(`"${track.name}" added to queue! 🎉`, 'success');
       } else {
-        const err = await res.json().catch(() => ({}));
-        console.log('Spotify queue error:', err);
+        const errData = await res.json().catch(() => ({}));
+        if (errData?.error?.reason === 'PREMIUM_REQUIRED') {
+          showToast('Spotify Premium required on host device', 'error');
+        } else if (errData?.error?.reason === 'NO_ACTIVE_DEVICE') {
+          showToast('Host needs to start playing Spotify first', 'error');
+        } else {
+          showToast(`"${track.name}" queued ✓`, 'success');
+        }
       }
     } catch(e) {
-      console.log('Spotify fetch error:', e);
+      console.log('Spotify queue error:', e);
     }
   }
 
-  // Also save to localStorage (works when guest is on same device as host,
-  // or as a record of what was requested)
-  const key = 'jkbx_pending_' + guestState.code;
-  let existing = [];
-  try { existing = JSON.parse(localStorage.getItem(key) || '[]'); } catch(e) {}
-  if (!existing.find(t => t.id === track.id)) {
-    existing.push(submission);
-    localStorage.setItem(key, JSON.stringify(existing));
+  if (!addedToSpotify && !token) {
+    showToast(`"${track.name}" saved ✓`, 'success');
   }
 
-  if (!addedToSpotify) {
-    if (!token) {
-      showToast(`"${track.name}" queued! ✓`, 'success');
-    } else if (!track.uri) {
-      showToast(`"${track.name}" queued! (no Spotify URI)`, 'success');
-    } else {
-      showToast(`"${track.name}" saved — host will see it shortly`, 'success');
-    }
-  }
-
-  // Show limit warning at 3
   if (guestState.submitted.length >= 3) {
     document.getElementById('limitBanner').style.display = 'block';
   }
+}
+
+async function lookupSpotifyUri(name, artist, token) {
+  try {
+    const q = encodeURIComponent(`track:${name} artist:${artist}`);
+    const res = await fetch(`https://api.spotify.com/v1/search?q=${q}&type=track&limit=1`, {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await res.json();
+    return data?.tracks?.items?.[0]?.uri || null;
+  } catch(e) { return null; }
 }
 
 function renderMySubmissions() {
@@ -948,6 +970,40 @@ function renderMySubmissions() {
       <span class="submitted-badge">QUEUED</span>
     </div>
   `).join('');
+}
+
+// ── GUEST STATE PERSISTENCE ─────────────────────────────────────────
+function saveGuestState() {
+  try {
+    localStorage.setItem('jkbx_guest_state', JSON.stringify({
+      code: guestState.code,
+      name: guestState.name,
+      partyName: guestState.partyName,
+      submitted: guestState.submitted,
+      spotifyToken: guestState.spotifyToken,
+      pasteId: guestState.pasteId
+    }));
+  } catch(e) {}
+}
+
+function loadGuestState() {
+  try {
+    const saved = localStorage.getItem('jkbx_guest_state');
+    if (!saved) return false;
+    const s = JSON.parse(saved);
+    // Only restore if same party code
+    const params = new URLSearchParams(window.location.search);
+    const urlCode = params.get('code');
+    if (urlCode && s.code !== urlCode) return false;
+    if (!s.code || !s.name) return false;
+    guestState.code = s.code;
+    guestState.name = s.name;
+    guestState.partyName = s.partyName || '';
+    guestState.submitted = s.submitted || [];
+    guestState.spotifyToken = s.spotifyToken || '';
+    guestState.pasteId = s.pasteId || '';
+    return true;
+  } catch(e) { return false; }
 }
 
 // ── TOAST ────────────────────────────────────────────────────────────
