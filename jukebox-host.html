@@ -1145,12 +1145,14 @@ let state = {
   queue: [],
   partyCode: '',
   guestLink: '',
+  guestLinkShort: '',
   isPlaying: false,
   currentTrack: null,
   playedCount: 0,
   guestCount: new Set(),
   progressInterval: null,
-  pollInterval: null
+  pollInterval: null,
+  submitterMap: {}  // uri → guest name, persists across queue refreshes
 };
 
 // ── INIT ────────────────────────────────────────────────────────────
@@ -1174,6 +1176,7 @@ window.onload = async () => {
     if (ok) {
       loadSavedState();
       showDashboard();
+      loadSubmitterMap();
       startPolling();
     } else {
       // Show a permanent error screen — do NOT redirect anywhere
@@ -1233,6 +1236,46 @@ function loadSavedState() {
   if (saved) { try { state.queue = JSON.parse(saved); } catch(e) {} }
   const savedCode = localStorage.getItem('jkbx_code');
   if (savedCode) state.partyCode = savedCode;
+}
+
+function loadSubmitterMap() {
+  try {
+    const code = state.partyCode || localStorage.getItem('jkbx_code') || '';
+    if (!code) return;
+
+    // Read from jkbx_pending_ (array of track objects with submitter)
+    const pending = localStorage.getItem('jkbx_pending_' + code);
+    if (pending) {
+      JSON.parse(pending).forEach(t => {
+        if (t.uri && (t.submitter || t.name)) {
+          state.submitterMap[t.uri] = t.submitter || t.name;
+        }
+      });
+    }
+
+    // Read from jkbx_who_ (uri → name map)
+    const who = localStorage.getItem('jkbx_who_' + code);
+    if (who) {
+      const whoMap = JSON.parse(who);
+      Object.entries(whoMap).forEach(([uri, name]) => {
+        state.submitterMap[uri] = name;
+      });
+    }
+  } catch(e) {}
+}
+
+function loadSubmitterMap() {
+  // Rebuild submitterMap from jkbx_pending on startup/refresh
+  try {
+    const code = state.partyCode || localStorage.getItem('jkbx_code') || '';
+    if (!code) return;
+    const pending = localStorage.getItem('jkbx_pending_' + code);
+    if (!pending) return;
+    const tracks = JSON.parse(pending);
+    tracks.forEach(t => {
+      if (t.uri && t.submitter) state.submitterMap[t.uri] = t.submitter;
+    });
+  } catch(e) {}
 }
 
 function showLoadingOverlay(msg) {
@@ -1578,16 +1621,8 @@ async function pollSpotifyQueue() {
   const upNext = queueData.queue || [];
   const nowPlayingUri = state.currentTrack?.uri || '';
 
-  // Build submitter map: first from our persistent localStorage record,
-  // then overlay with any names already in state.queue
-  const submitterMap = {};
-  try {
-    const whoKey = 'jkbx_who_' + state.partyCode;
-    const stored = JSON.parse(localStorage.getItem(whoKey) || '{}');
-    Object.assign(submitterMap, stored);
-  } catch(e) {}
-  // Also preserve any names already in current queue display
-  state.queue.forEach(q => { if (q.uri && q.submitter && q.submitter !== '♫') submitterMap[q.uri] = q.submitter; });
+  // Use persistent submitterMap — never wiped, accumulates all guest names
+  const submitterMap = state.submitterMap;
 
   // Deduplicate by URI and filter out currently-playing track
   const seenUris = new Set();
@@ -1633,16 +1668,15 @@ function checkGuestSubmissions() {
   try {
     const tracks = JSON.parse(pending);
       tracks.forEach(track => {
-      if (track.submitter) state.guestCount.add(track.submitter);
+      if (track.submitter) {
+        state.guestCount.add(track.submitter);
+        // Persistently map this URI to the guest's name
+        if (track.uri) state.submitterMap[track.uri] = track.submitter;
+      }
       if (track.uri && state.accessToken) addToSpotifyQueue(track.uri);
     });
-    // Also count guests from the who map
-    try {
-      const whoKey = 'jkbx_who_' + state.partyCode;
-      const who = JSON.parse(localStorage.getItem(whoKey) || '{}');
-      Object.values(who).forEach(name => state.guestCount.add(name));
-    } catch(e) {}
     // Don't manually add to state.queue — pollSpotifyQueue will sync it
+    loadSubmitterMap(); // refresh submitter names after new submissions
   } catch(e) { console.log('checkGuestSubmissions error:', e); }
 }
 
