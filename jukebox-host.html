@@ -424,6 +424,45 @@
   .ctrl-btn.primary { color: var(--text); font-size: 1.6rem; }
   .ctrl-btn.primary:hover { color: var(--amber); }
 
+  .shuffle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--deep);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: "DM Mono", monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 8px 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .shuffle-btn:hover { border-color: var(--amber); color: var(--amber); }
+  .shuffle-btn.active { border-color: var(--green); color: var(--green); background: rgba(29,185,84,0.06); }
+
+  .shuffle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--deep);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 8px 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-left: auto;
+  }
+  .shuffle-btn:hover { border-color: var(--amber); color: var(--amber); }
+  .shuffle-btn.active { border-color: var(--green); color: var(--green); background: rgba(29,185,84,0.06); }
+
   /* Party Code */
   .party-code-display {
     font-family: 'Bebas Neue', sans-serif;
@@ -1111,7 +1150,12 @@
   <!-- BOTTOM: Full-width Queue -->
   <div class="dash-bottom">
     <div class="queue-panel">
-      <h2>QUEUE</h2>
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+        <h2 style="margin:0;">QUEUE</h2>
+        <button class="shuffle-btn" id="shuffleBtn" onclick="toggleShuffle()" title="Shuffle queue">
+          ⇄ SHUFFLE
+        </button>
+      </div>
       <div class="queue-meta" id="queueMeta">0 songs — share your code to get started</div>
       <div class="queue-list" id="queueList">
         <div class="empty-queue">
@@ -1604,6 +1648,11 @@ async function pollPlayback() {
     statusText.textContent = 'Paused';
   }
 
+  // Sync shuffle state
+  if (typeof data.shuffle_state === 'boolean') {
+    syncShuffleState(data.shuffle_state);
+  }
+
   // Also fetch Spotify's queue and sync it to our display
   pollSpotifyQueue();
 }
@@ -1769,6 +1818,44 @@ function shareAction(type) {
 // Also update the existing copyLink to use shareParty
 function copyLink() {
   shareParty();
+}
+
+// ── SHUFFLE ──────────────────────────────────────────────────────────
+let shuffleActive = false;
+
+async function toggleShuffle() {
+  shuffleActive = !shuffleActive;
+  const btn = document.getElementById('shuffleBtn');
+
+  // Tell Spotify to enable/disable shuffle
+  await spotifyFetch(`/me/player/shuffle?state=${shuffleActive}`, 'PUT');
+
+  if (shuffleActive) {
+    btn.classList.add('active');
+    btn.textContent = '⇄ ON';
+    btn.title = 'Shuffle is ON — click to turn off';
+  } else {
+    btn.classList.remove('active');
+    btn.textContent = '⇄ SHUFFLE';
+    btn.title = 'Shuffle queue';
+  }
+
+  // Force queue refresh to show new order
+  setTimeout(() => { lastQueuePoll = 0; pollPlayback(); }, 600);
+}
+
+// Sync shuffle state from Spotify on playback poll
+function syncShuffleState(isShuffled) {
+  shuffleActive = isShuffled;
+  const btn = document.getElementById('shuffleBtn');
+  if (!btn) return;
+  if (isShuffled) {
+    btn.classList.add('active');
+    btn.textContent = '⇄ ON';
+  } else {
+    btn.classList.remove('active');
+    btn.textContent = '⇄ SHUFFLE';
+  }
 }
 
 // ── UTILS ────────────────────────────────────────────────────────────
