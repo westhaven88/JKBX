@@ -1521,11 +1521,11 @@ async function togglePlay() {
 async function spotifyNext() {
   await spotifyFetch('/me/player/next', 'POST');
   state.playedCount++;
-  if (state.queue.length > 0) {
-    state.queue.shift();
-    renderQueue();
-  }
-  setTimeout(pollPlayback, 500);
+  // Clear queue and wait for Spotify to report the new state
+  state.queue = [];
+  renderQueue();
+  lastQueuePoll = 0; // force immediate queue refresh
+  setTimeout(pollPlayback, 800);
 }
 
 async function spotifyPrev() {
@@ -1579,28 +1579,26 @@ async function pollSpotifyQueue() {
   if (!queueData) return;
 
   const upNext = queueData.queue || [];
-  if (!upNext.length) return;
 
-  // Merge Spotify queue tracks into our display queue
-  // avoiding duplicates by Spotify URI
-  let changed = false;
-  upNext.slice(0, 20).forEach(t => {
-    const uri = t.uri;
-    if (!state.queue.find(q => q.uri === uri)) {
-      state.queue.push({
-        id: t.id,
-        name: t.name,
-        artist: t.artists.map(a => a.name).join(', '),
-        albumArt: t.album?.images?.[1]?.url || t.album?.images?.[0]?.url || '',
-        uri: uri,
-        duration: t.duration_ms,
-        submitter: '♫'  // mark as from Spotify queue
-      });
-      changed = true;
-    }
-  });
+  // Replace queue entirely with Spotify's live queue
+  // Preserve submitter names for tracks already in our queue
+  const submitterMap = {};
+  state.queue.forEach(q => { if (q.uri && q.submitter !== '♫') submitterMap[q.uri] = q.submitter; });
 
+  const newQueue = upNext.slice(0, 20).map(t => ({
+    id: t.id,
+    name: t.name,
+    artist: t.artists.map(a => a.name).join(', '),
+    albumArt: t.album?.images?.[1]?.url || t.album?.images?.[0]?.url || '',
+    uri: t.uri,
+    duration: t.duration_ms,
+    submitter: submitterMap[t.uri] || '♫'
+  }));
+
+  // Only re-render if something actually changed
+  const changed = JSON.stringify(newQueue.map(t => t.uri)) !== JSON.stringify(state.queue.map(t => t.uri));
   if (changed) {
+    state.queue = newQueue;
     renderQueue();
     updateStats();
   }
@@ -1619,20 +1617,12 @@ function checkGuestSubmissions() {
   if (!pending) return;
   try {
     const tracks = JSON.parse(pending);
-    let changed = false;
-    tracks.forEach(track => {
-      if (!state.queue.find(t => t.id === track.id)) {
-        state.queue.push(track);
-        if (track.submitter) state.guestCount.add(track.submitter);
-        // Add to Spotify queue if not already added by guest directly
-        if (track.uri && state.accessToken) addToSpotifyQueue(track.uri);
-        changed = true;
-      }
+      tracks.forEach(track => {
+      if (track.submitter) state.guestCount.add(track.submitter);
+      // Add to Spotify queue — the queue display will sync via pollSpotifyQueue
+      if (track.uri && state.accessToken) addToSpotifyQueue(track.uri);
     });
-    if (changed) {
-      renderQueue();
-      updateStats();
-    }
+    // Don't manually add to state.queue — pollSpotifyQueue will sync it
   } catch(e) { console.log('checkGuestSubmissions error:', e); }
 }
 
