@@ -694,9 +694,7 @@ function showHint() {
 async function searchSpotify(query) {
   showLoading();
 
-  // Use token already fetched, or try to get it from JSONBin
   let token = guestState.spotifyToken || '';
-
   if (!token || token.length < 20) {
     token = await fetchPartyToken();
     if (token) guestState.spotifyToken = token;
@@ -705,7 +703,12 @@ async function searchSpotify(query) {
   if (token && token.length > 20) {
     await searchViaSpotify(query, token);
   } else {
-    await searchViaMusicBrainz(query);
+    // No token — show message asking to get the invite link
+    document.getElementById('searchResults').innerHTML = `
+      <div class="hint">
+        <span class="hint-icon">🔗</span>
+        For best results, open the invite link<br>sent by your host (not just the QR code).
+      </div>`;
   }
 }
 
@@ -728,25 +731,74 @@ async function fetchPartyToken() {
 
 async function searchViaSpotify(query, token) {
   try {
-    // If searching for a band like "Doors", also try "The Doors"
-    const searchQuery = query;
-    const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(searchQuery)}&type=track&limit=20`;
-    const res = await fetch(url, {
-      headers: { 'Authorization': 'Bearer ' + token }
-    });
+    // Step 1: Try to find the artist by name for top tracks
+    const artistRes = await fetch(
+      `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=artist&limit=5`,
+      { headers: { 'Authorization': 'Bearer ' + token } }
+    );
 
-    if (res.status === 401) {
-      // Token expired — fall back
-      await searchViaMusicBrainz(query);
-      return;
+    if (artistRes.status === 401) { guestState.spotifyToken = ''; return; }
+
+    const artistData = await artistRes.json();
+    const artists = artistData?.artists?.items || [];
+
+    // Find best artist match (exact or starts with query, case-insensitive)
+    const q = query.toLowerCase();
+    const bestArtist = artists.find(a =>
+      a.name.toLowerCase() === q ||
+      a.name.toLowerCase() === 'the ' + q ||
+      a.name.toLowerCase().startsWith(q)
+    ) || artists[0];
+
+    if (bestArtist) {
+      // Step 2: Get their top tracks (these are the popular songs)
+      const topRes = await fetch(
+        `https://api.spotify.com/v1/artists/${bestArtist.id}/top-tracks?market=US`,
+        { headers: { 'Authorization': 'Bearer ' + token } }
+      );
+      const topData = await topRes.json();
+      const topTracks = topData?.tracks || [];
+
+      if (topTracks.length > 0) {
+        // Also fetch more tracks via search to supplement if fewer than 10
+        let allTracks = topTracks;
+        if (topTracks.length < 10) {
+          const moreRes = await fetch(
+            `https://api.spotify.com/v1/search?q=artist:${encodeURIComponent(bestArtist.name)}&type=track&limit=20`,
+            { headers: { 'Authorization': 'Bearer ' + token } }
+          );
+          const moreData = await moreRes.json();
+          const moreItems = moreData?.tracks?.items || [];
+          // Merge, dedup by id
+          const seen = new Set(topTracks.map(t => t.id));
+          moreItems.forEach(t => { if (!seen.has(t.id)) { seen.add(t.id); allTracks.push(t); } });
+        }
+
+        const tracks = allTracks.slice(0, 20).map(t => ({
+          id: t.id,
+          name: t.name,
+          artist: t.artists.map(a => a.name).join(', '),
+          album: t.album?.name || '',
+          duration_ms: t.duration_ms,
+          albumArt: t.album?.images?.[1]?.url || t.album?.images?.[0]?.url || '',
+          uri: t.uri
+        }));
+        renderResults(tracks);
+        return;
+      }
     }
 
-    const data = await res.json();
-    const items = data?.tracks?.items || [];
+    // Step 3: Artist not found — do a track search
+    const trackRes = await fetch(
+      `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=20`,
+      { headers: { 'Authorization': 'Bearer ' + token } }
+    );
+    const trackData = await trackRes.json();
+    const items = trackData?.tracks?.items || [];
 
-    if (items.length === 0) {
-      // Fall back to MusicBrainz before giving up
-      await searchViaMusicBrainz(query);
+    if (!items.length) {
+      document.getElementById('searchResults').innerHTML =
+        `<div class="hint">No results found — try a different search</div>`;
       return;
     }
 
@@ -754,15 +806,17 @@ async function searchViaSpotify(query, token) {
       id: t.id,
       name: t.name,
       artist: t.artists.map(a => a.name).join(', '),
-      album: t.album.name,
+      album: t.album?.name || '',
       duration_ms: t.duration_ms,
-      albumArt: t.album.images?.[1]?.url || t.album.images?.[0]?.url || '',
+      albumArt: t.album?.images?.[1]?.url || t.album?.images?.[0]?.url || '',
       uri: t.uri
     }));
-
     renderResults(tracks);
+
   } catch(e) {
-    await searchViaMusicBrainz(query);
+    console.log('Spotify search error:', e);
+    document.getElementById('searchResults').innerHTML =
+      `<div class="hint">Search error — please try again</div>`;
   }
 }
 
