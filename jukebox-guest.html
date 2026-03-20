@@ -575,16 +575,24 @@ window.onload = () => {
   const params = new URLSearchParams(window.location.search);
   const code = params.get('code');
   const party = params.get('party');
+  const tokenParam = params.get('t');
+  const pasteParam = params.get('d');
+
+  // Always read token from URL first — this is the freshest source
+  if (tokenParam && tokenParam.length > 20) {
+    guestState.spotifyToken = tokenParam;
+  }
+  if (pasteParam) guestState.pasteId = pasteParam;
 
   // Restore saved guest state (phone woke up, tab refreshed, etc.)
   if (loadGuestState()) {
-    // Update token from URL if fresher one is present
-    const tokenParam = params.get('t');
-    const pasteParam = params.get('d');
+    // Always override token with URL value if present (URL token is fresher)
     if (tokenParam && tokenParam.length > 20) guestState.spotifyToken = tokenParam;
     if (pasteParam) guestState.pasteId = pasteParam;
     if (code) guestState.code = code;
     if (party) guestState.partyName = decodeURIComponent(party);
+    // Save updated state with fresh token
+    saveGuestState();
     document.getElementById('headerCode').textContent = guestState.code;
     document.getElementById('headerPartyName').textContent = guestState.partyName || 'Party';
     showSearch();
@@ -709,17 +717,19 @@ async function searchSpotify(query) {
 }
 
 async function fetchPartyToken() {
-  // Token is in URL param 't' — read it directly, no external service needed
+  // 1. Check memory first
   if (guestState.spotifyToken && guestState.spotifyToken.length > 20) {
     return guestState.spotifyToken;
   }
-  // Try reading fresh from current URL (in case state was restored without token)
+  // 2. Read from current URL — the token is embedded as &t=
   const params = new URLSearchParams(window.location.search);
   const t = params.get('t');
   if (t && t.length > 20) {
     guestState.spotifyToken = t;
+    saveGuestState();
     return t;
   }
+  // 3. No token available
   return '';
 }
 
@@ -987,7 +997,6 @@ function loadGuestState() {
     const saved = localStorage.getItem('jkbx_guest_state');
     if (!saved) return false;
     const s = JSON.parse(saved);
-    // Only restore if same party code
     const params = new URLSearchParams(window.location.search);
     const urlCode = params.get('code');
     if (urlCode && s.code !== urlCode) return false;
@@ -996,7 +1005,8 @@ function loadGuestState() {
     guestState.name = s.name;
     guestState.partyName = s.partyName || '';
     guestState.submitted = s.submitted || [];
-    guestState.spotifyToken = s.spotifyToken || '';
+    // NEVER restore old token from storage — always get fresh from URL
+    // (old token may be expired)
     guestState.pasteId = s.pasteId || '';
     return true;
   } catch(e) { return false; }
