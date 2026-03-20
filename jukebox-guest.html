@@ -848,8 +848,10 @@ function renderResults(tracks) {
 
   const addedIds = new Set(guestState.submitted.map(t => t.id));
 
+  const hasSpotify = tracks.length > 0 && tracks[0].uri;
+  const sourceLabel = hasSpotify ? 'Spotify search' : 'Music search';
   document.getElementById('searchResults').innerHTML = `
-    <div class="ai-badge"><div class="ai-dot"></div> iTunes search</div>
+    <div class="ai-badge"><div class="ai-dot"></div> ${sourceLabel}</div>
     <div class="section-label">Results</div>
     <div class="results-list">
       ${tracks.map(track => `
@@ -900,12 +902,11 @@ async function addTrack(track) {
   }
 
   if (!uri) {
-    showStatus('❌ Could not find "' + track.name + '" on Spotify.', true);
-    showToast('Song not found on Spotify', 'error');
-    if (el) el.querySelector('.add-icon').textContent = '✗';
-    return;
+    // Still add to our queue display, just can't auto-play on Spotify
+    showStatus('⚠️ No Spotify URI found — adding to queue anyway', false);
+  } else {
+    showStatus('✓ Found URI. Adding to Spotify queue...');
   }
-  showStatus('✓ Found URI. Step 3: Adding to Spotify queue...');
 
   const submission = { ...track, uri, submitter: guestState.name, submittedAt: Date.now() };
   guestState.submitted.push(submission);
@@ -963,12 +964,29 @@ async function addTrack(track) {
 }
 
 async function lookupSpotifyUri(name, artist, token) {
+  if (!token) return null;
   try {
-    const q = encodeURIComponent(`track:${name} artist:${artist}`);
-    const res = await fetch(`https://api.spotify.com/v1/search?q=${q}&type=track&limit=1`, {
+    // Strategy 1: exact track + artist search
+    let q = `track:${name} artist:${artist}`;
+    let res = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=1`, {
       headers: { 'Authorization': 'Bearer ' + token }
     });
-    const data = await res.json();
+    let data = await res.json();
+    if (data?.tracks?.items?.[0]?.uri) return data.tracks.items[0].uri;
+
+    // Strategy 2: looser search — just name and artist as plain text
+    q = `${name} ${artist}`;
+    res = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=1`, {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    data = await res.json();
+    if (data?.tracks?.items?.[0]?.uri) return data.tracks.items[0].uri;
+
+    // Strategy 3: just the track name
+    res = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(name)}&type=track&limit=1`, {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    data = await res.json();
     return data?.tracks?.items?.[0]?.uri || null;
   } catch(e) { return null; }
 }
