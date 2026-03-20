@@ -911,6 +911,36 @@ async function addTrack(track) {
   const submission = { ...track, uri, submitter: guestState.name, submittedAt: Date.now() };
   guestState.submitted.push(submission);
   saveGuestState();
+
+  // Write URI→submitter mapping so host can show who picked each song
+  if (uri) {
+    try {
+      const whoKey = 'jkbx_who_' + guestState.code;
+      const who = JSON.parse(localStorage.getItem(whoKey) || '{}');
+      who[uri] = guestState.name;
+      localStorage.setItem(whoKey, JSON.stringify(who));
+    } catch(e) {}
+  }
+
+  // Write URI→submitter mapping so host can show who picked each song
+  if (uri) {
+    try {
+      const whoKey = 'jkbx_who_' + guestState.code;
+      const who = JSON.parse(localStorage.getItem(whoKey) || '{}');
+      who[uri] = guestState.name;
+      localStorage.setItem(whoKey, JSON.stringify(who));
+    } catch(e) {}
+  }
+
+  // Write URI→submitter mapping so host can show who picked each song
+  if (uri) {
+    try {
+      const whoKey = 'jkbx_who_' + guestState.code;
+      const who = JSON.parse(localStorage.getItem(whoKey) || '{}');
+      who[uri] = guestState.name;
+      localStorage.setItem(whoKey, JSON.stringify(who));
+    } catch(e) {}
+  }
   if (el) el.querySelector('.add-icon').textContent = '✓';
   renderMySubmissions();
 
