@@ -1521,10 +1521,7 @@ async function togglePlay() {
 async function spotifyNext() {
   await spotifyFetch('/me/player/next', 'POST');
   state.playedCount++;
-  // Remove only the first item — don't clear the whole queue (avoids blink)
-  if (state.queue.length > 0) state.queue.shift();
-  renderQueue();
-  // Force queue refresh after Spotify processes the skip
+  // Don't touch state.queue — let pollSpotifyQueue sync it from Spotify
   setTimeout(() => { lastQueuePoll = 0; pollPlayback(); }, 1000);
 }
 
