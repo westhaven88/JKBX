@@ -1504,6 +1504,8 @@ async function spotifyPrev() {
 
 async function pollPlayback() {
   if (!state.accessToken) return;
+
+  // Fetch current playback
   const data = await spotifyFetch('/me/player');
   if (!data || !data.item) return;
 
@@ -1529,6 +1531,47 @@ async function pollPlayback() {
   } else {
     dot.classList.remove('live');
     statusText.textContent = 'Paused';
+  }
+
+  // Also fetch Spotify's queue and sync it to our display
+  pollSpotifyQueue();
+}
+
+let lastQueuePoll = 0;
+async function pollSpotifyQueue() {
+  // Only poll queue every 5 seconds to avoid rate limiting
+  const now = Date.now();
+  if (now - lastQueuePoll < 5000) return;
+  lastQueuePoll = now;
+
+  const queueData = await spotifyFetch('/me/player/queue');
+  if (!queueData) return;
+
+  const upNext = queueData.queue || [];
+  if (!upNext.length) return;
+
+  // Merge Spotify queue tracks into our display queue
+  // avoiding duplicates by Spotify URI
+  let changed = false;
+  upNext.slice(0, 20).forEach(t => {
+    const uri = t.uri;
+    if (!state.queue.find(q => q.uri === uri)) {
+      state.queue.push({
+        id: t.id,
+        name: t.name,
+        artist: t.artists.map(a => a.name).join(', '),
+        albumArt: t.album?.images?.[1]?.url || t.album?.images?.[0]?.url || '',
+        uri: uri,
+        duration: t.duration_ms,
+        submitter: '♫'  // mark as from Spotify queue
+      });
+      changed = true;
+    }
+  });
+
+  if (changed) {
+    renderQueue();
+    updateStats();
   }
 }
 
