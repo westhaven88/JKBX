@@ -1521,11 +1521,11 @@ async function togglePlay() {
 async function spotifyNext() {
   await spotifyFetch('/me/player/next', 'POST');
   state.playedCount++;
-  // Clear queue and wait for Spotify to report the new state
-  state.queue = [];
+  // Remove only the first item — don't clear the whole queue (avoids blink)
+  if (state.queue.length > 0) state.queue.shift();
   renderQueue();
-  lastQueuePoll = 0; // force immediate queue refresh
-  setTimeout(pollPlayback, 800);
+  // Force queue refresh after Spotify processes the skip
+  setTimeout(() => { lastQueuePoll = 0; pollPlayback(); }, 1000);
 }
 
 async function spotifyPrev() {
@@ -1579,25 +1579,36 @@ async function pollSpotifyQueue() {
   if (!queueData) return;
 
   const upNext = queueData.queue || [];
+  const nowPlayingUri = state.currentTrack?.uri || '';
 
-  // Replace queue entirely with Spotify's live queue
-  // Preserve submitter names for tracks already in our queue
+  // Preserve submitter names
   const submitterMap = {};
   state.queue.forEach(q => { if (q.uri && q.submitter !== '♫') submitterMap[q.uri] = q.submitter; });
 
-  const newQueue = upNext.slice(0, 20).map(t => ({
-    id: t.id,
-    name: t.name,
-    artist: t.artists.map(a => a.name).join(', '),
-    albumArt: t.album?.images?.[1]?.url || t.album?.images?.[0]?.url || '',
-    uri: t.uri,
-    duration: t.duration_ms,
-    submitter: submitterMap[t.uri] || '♫'
-  }));
+  // Deduplicate by URI and filter out currently-playing track
+  const seenUris = new Set();
+  if (nowPlayingUri) seenUris.add(nowPlayingUri);
 
-  // Only re-render if something actually changed
-  const changed = JSON.stringify(newQueue.map(t => t.uri)) !== JSON.stringify(state.queue.map(t => t.uri));
-  if (changed) {
+  const newQueue = [];
+  for (const t of upNext) {
+    if (!t.uri || seenUris.has(t.uri)) continue; // skip duplicates
+    seenUris.add(t.uri);
+    newQueue.push({
+      id: t.id,
+      name: t.name,
+      artist: t.artists.map(a => a.name).join(', '),
+      albumArt: t.album?.images?.[1]?.url || t.album?.images?.[0]?.url || '',
+      uri: t.uri,
+      duration: t.duration_ms,
+      submitter: submitterMap[t.uri] || '♫'
+    });
+    if (newQueue.length >= 15) break;
+  }
+
+  // Only re-render if URIs changed
+  const newUris = newQueue.map(t => t.uri).join(',');
+  const oldUris = state.queue.map(t => t.uri).join(',');
+  if (newUris !== oldUris) {
     state.queue = newQueue;
     renderQueue();
     updateStats();
