@@ -576,23 +576,18 @@ window.onload = () => {
   const code = params.get('code');
   const party = params.get('party');
   const tokenParam = params.get('t');
-  const pasteParam = params.get('d');
 
-  // Always read token from URL first — this is the freshest source
+  // If URL has a fresh token, clear ALL old saved state and start clean
+  // This ensures stale names like "Rob8" don't persist
   if (tokenParam && tokenParam.length > 20) {
+    localStorage.removeItem('jkbx_guest_state');
     guestState.spotifyToken = tokenParam;
   }
-  if (pasteParam) guestState.pasteId = pasteParam;
 
-  // Restore saved guest state (phone woke up, tab refreshed, etc.)
-  if (loadGuestState()) {
-    // Always override token with URL value if present (URL token is fresher)
-    if (tokenParam && tokenParam.length > 20) guestState.spotifyToken = tokenParam;
-    if (pasteParam) guestState.pasteId = pasteParam;
+  // Restore saved state only if no fresh token in URL
+  if (!tokenParam && loadGuestState()) {
     if (code) guestState.code = code;
     if (party) guestState.partyName = decodeURIComponent(party);
-    // Save updated state with fresh token
-    saveGuestState();
     document.getElementById('headerCode').textContent = guestState.code;
     document.getElementById('headerPartyName').textContent = guestState.partyName || 'Party';
     showSearch();
