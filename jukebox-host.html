@@ -1545,9 +1545,16 @@ function renderQueue() {
         <div class="track-artist">${escHtml(track.artist)}</div>
       </div>
       <span class="track-submitter">${escHtml(track.submitter || '')}</span>
-      <button class="remove-btn" onclick="removeTrack('${track.uri || track.id}')" title="Remove">✕</button>
+      <button class="remove-btn" data-uri="${track.uri || ''}" data-id="${track.id || ''}" title="Remove">✕</button>
     </div>
   `).join('');
+
+  // Attach remove handlers after rendering (avoids inline onclick issues with special chars)
+  list.querySelectorAll('.remove-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      removeTrack(btn.dataset.uri || btn.dataset.id);
+    });
+  });
 
   updateStats();
   saveQueue();
