@@ -1625,6 +1625,13 @@ async function pollPlayback() {
   if (!data || !data.item) return;
 
   const track = data.item;
+
+  // If track changed and shuffleOrder is active, remove the played URI
+  if (shuffleOrder.length > 0 && state.currentTrack && state.currentTrack.uri !== track.uri) {
+    // Remove the old now-playing track from shuffleOrder if it's there
+    shuffleOrder = shuffleOrder.filter(uri => uri !== state.currentTrack.uri);
+  }
+
   state.isPlaying = data.is_playing;
   state.currentTrack = track;
 
