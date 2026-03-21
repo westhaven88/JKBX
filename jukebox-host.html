@@ -1654,7 +1654,7 @@ async function pollPlayback() {
   }
 
   // Also fetch Spotify's queue and sync it to our display
-  pollSpotifyQueue();
+  if (!shuffleLock) pollSpotifyQueue();
 }
 
 let lastQueuePoll = 0;
@@ -1886,7 +1886,7 @@ async function toggleShuffle() {
   }
   // Lock queue poll for 20 seconds so shuffled display stays visible
   shuffleLock = true;
-  setTimeout(() => { shuffleLock = false; }, 20000);
+  setTimeout(() => { shuffleLock = false; lastQueuePoll = 0; }, 30000);
 
   // Refresh queue display after a moment
   setTimeout(() => {
