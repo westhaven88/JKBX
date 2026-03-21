@@ -1659,6 +1659,8 @@ async function pollPlayback() {
 
 let lastQueuePoll = 0;
 async function pollSpotifyQueue() {
+  // Don't overwrite display if shuffle just ran
+  if (shuffleLock) return;
   // Only poll queue every 5 seconds to avoid rate limiting
   const now = Date.now();
   if (now - lastQueuePoll < 5000) return;
@@ -1821,6 +1823,8 @@ function copyLink() {
 }
 
 // ── SHUFFLE ──────────────────────────────────────────────────────────
+let shuffleLock = false; // when true, queue poll won't overwrite display
+
 async function toggleShuffle() {
   if (state.queue.length < 2) {
     showShuffleToast('Add more songs first!');
@@ -1830,7 +1834,7 @@ async function toggleShuffle() {
   console.log('Queue URIs:', state.queue.map(t => t.uri));
 
   const btn = document.getElementById('shuffleBtn');
-  btn.textContent = '⇄ ...';
+  btn.textContent = '⇄ Working...';
   btn.disabled = true;
 
   // Fisher-Yates shuffle of current queue
@@ -1870,27 +1874,26 @@ async function toggleShuffle() {
   }
 
   btn.classList.add('active');
-  btn.textContent = '⇄ SHUFFLED';
+  btn.textContent = '⇄ Shuffled!';
   btn.disabled = false;
 
   if (added > 0) {
     showShuffleToast('🎲 Shuffled! ' + added + ' songs re-queued');
-    // Pause queue polling for 15s so shuffled display stays visible
-    // Spotify needs time to process the new queue order anyway
-    lastQueuePoll = Date.now() + 15000;
   } else if (skipped === shuffled.length) {
-    showShuffleToast('⚠️ No Spotify URIs found in queue — try re-adding songs');
+    showShuffleToast('⚠️ No Spotify URIs found — try re-adding songs');
   } else {
-    showShuffleToast('Display order shuffled ✓');
-    lastQueuePoll = Date.now() + 15000;
+    showShuffleToast('Display shuffled ✓');
   }
+  // Lock queue poll for 20 seconds so shuffled display stays visible
+  shuffleLock = true;
+  setTimeout(() => { shuffleLock = false; }, 20000);
 
   // Refresh queue display after a moment
   setTimeout(() => {
     lastQueuePoll = 0;
     pollPlayback();
     setTimeout(() => {
-      btn.textContent = '⇄ SHUFFLE';
+      btn.textContent = '⇄ Shuffle?';
       btn.classList.remove('active');
     }, 3000);
   }, 1500);
