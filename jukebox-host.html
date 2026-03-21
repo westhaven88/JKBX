@@ -1554,8 +1554,15 @@ function renderQueue() {
 }
 
 function removeTrack(id) {
+  const track = state.queue.find(t => t.id === id);
+  if (track?.uri) state.deletedUris.add(track.uri);
   state.queue = state.queue.filter(t => t.id !== id);
+  // Also remove from shuffleOrder
+  if (track?.uri && shuffleOrder.length > 0) {
+    shuffleOrder = shuffleOrder.filter(u => u !== track.uri);
+  }
   renderQueue();
+  updateStats();
 }
 
 function saveQueue() {
