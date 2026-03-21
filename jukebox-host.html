@@ -1826,6 +1826,8 @@ async function toggleShuffle() {
     showShuffleToast('Add more songs first!');
     return;
   }
+  // Log queue URIs for debugging
+  console.log('Queue URIs:', state.queue.map(t => t.uri));
 
   const btn = document.getElementById('shuffleBtn');
   btn.textContent = '⇄ ...';
@@ -1844,19 +1846,40 @@ async function toggleShuffle() {
   // BEST APPROACH: Add all shuffled tracks to queue — they'll play after current song
   // and the display will update to show the new order
 
+  // Update queue display immediately with shuffled order
+  state.queue = shuffled;
+  renderQueue();
+
+  // Re-add all tracks to Spotify in new shuffled order using direct fetch
   let added = 0;
+  let skipped = 0;
   for (const track of shuffled) {
-    if (track.uri) {
-      const res = await spotifyFetch(`/me/player/queue?uri=${encodeURIComponent(track.uri)}`, 'POST');
-      if (res !== null) added++;
-      await new Promise(r => setTimeout(r, 100)); // small delay between calls
+    const uri = track.uri;
+    if (!uri || !uri.startsWith('spotify:track:')) {
+      skipped++;
+      continue;
     }
+    try {
+      const res = await fetch(
+        'https://api.spotify.com/v1/me/player/queue?uri=' + encodeURIComponent(uri),
+        { method: 'POST', headers: { 'Authorization': 'Bearer ' + state.accessToken } }
+      );
+      if (res.status === 204 || res.ok) added++;
+      await new Promise(r => setTimeout(r, 200));
+    } catch(e) { skipped++; }
   }
 
   btn.classList.add('active');
   btn.textContent = '⇄ SHUFFLED';
   btn.disabled = false;
-  showShuffleToast(`Queue shuffled! (${added} songs re-queued)`);
+
+  if (added > 0) {
+    showShuffleToast('🎲 Shuffled! ' + added + ' songs re-queued');
+  } else if (skipped === shuffled.length) {
+    showShuffleToast('⚠️ No Spotify URIs found in queue — try re-adding songs');
+  } else {
+    showShuffleToast('Display order shuffled ✓');
+  }
 
   // Refresh queue display after a moment
   setTimeout(() => {
