@@ -1192,11 +1192,12 @@ let state = {
   guestLinkShort: '',
   isPlaying: false,
   currentTrack: null,
+  lastPlayedUri: null,
   playedCount: 0,
   guestCount: new Set(),
   progressInterval: null,
   pollInterval: null,
-  submitterMap: {}  // uri → guest name, persists across queue refreshes
+  submitterMap: {}
 };
 
 // ── INIT ────────────────────────────────────────────────────────────
@@ -1607,8 +1608,7 @@ async function togglePlay() {
 
 async function spotifyNext() {
   await spotifyFetch('/me/player/next', 'POST');
-  state.playedCount++;
-  // Don't touch state.queue — let pollSpotifyQueue sync it from Spotify
+  // playedCount incremented in pollPlayback when track changes
   setTimeout(() => { lastQueuePoll = 0; pollPlayback(); }, 1000);
 }
 
@@ -1626,10 +1626,15 @@ async function pollPlayback() {
 
   const track = data.item;
 
-  // If track changed and shuffleOrder is active, remove the played URI
-  if (shuffleOrder.length > 0 && state.currentTrack && state.currentTrack.uri !== track.uri) {
-    // Remove the old now-playing track from shuffleOrder if it's there
-    shuffleOrder = shuffleOrder.filter(uri => uri !== state.currentTrack.uri);
+  // If track changed, update played tracking and shuffleOrder
+  if (state.currentTrack && state.currentTrack.uri !== track.uri) {
+    // Track the song that just finished
+    state.lastPlayedUri = state.currentTrack.uri;
+    state.playedCount++;
+    // Remove from shuffleOrder
+    if (shuffleOrder.length > 0) {
+      shuffleOrder = shuffleOrder.filter(uri => uri !== state.currentTrack.uri);
+    }
   }
 
   state.isPlaying = data.is_playing;
@@ -1682,9 +1687,11 @@ async function pollSpotifyQueue() {
   // Use persistent submitterMap — never wiped, accumulates all guest names
   const submitterMap = state.submitterMap;
 
-  // Deduplicate by URI and filter out currently-playing track
+  // Deduplicate by URI and filter out currently-playing track AND any previously played
   const seenUris = new Set();
   if (nowPlayingUri) seenUris.add(nowPlayingUri);
+  // Also filter out any track that matches what was previously playing
+  if (state.lastPlayedUri) seenUris.add(state.lastPlayedUri);
 
   const newQueue = [];
   for (const t of upNext) {
@@ -1912,7 +1919,7 @@ async function toggleShuffle() {
   btn.disabled = false;
 
   if (added > 0) {
-    showShuffleToast('🎲 Shuffled! ' + added + ' songs re-queued');
+    showShuffleToast('🎲 Display shuffled! Songs re-queued in Spotify');
   } else if (skipped === shuffled.length) {
     showShuffleToast('⚠️ No Spotify URIs found — try re-adding songs');
   } else {
