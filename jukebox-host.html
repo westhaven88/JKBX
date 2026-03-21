@@ -1545,7 +1545,7 @@ function renderQueue() {
         <div class="track-artist">${escHtml(track.artist)}</div>
       </div>
       <span class="track-submitter">${escHtml(track.submitter || '')}</span>
-      <button class="remove-btn" onclick="removeTrack('${track.id}')" title="Remove">✕</button>
+      <button class="remove-btn" onclick="removeTrack('${track.uri || track.id}')" title="Remove">✕</button>
     </div>
   `).join('');
 
@@ -1554,12 +1554,19 @@ function renderQueue() {
 }
 
 function removeTrack(id) {
-  const track = state.queue.find(t => t.id === id);
-  if (track?.uri) state.deletedUris.add(track.uri);
-  state.queue = state.queue.filter(t => t.id !== id);
-  // Also remove from shuffleOrder
-  if (track?.uri && shuffleOrder.length > 0) {
-    shuffleOrder = shuffleOrder.filter(u => u !== track.uri);
+  // Find by id OR uri (handles both cases)
+  const track = state.queue.find(t => t.id === id || t.uri === id);
+  if (track) {
+    if (track.uri) {
+      state.deletedUris.add(track.uri);
+      if (shuffleOrder.length > 0) {
+        shuffleOrder = shuffleOrder.filter(u => u !== track.uri);
+      }
+    }
+    state.queue = state.queue.filter(t => t.id !== track.id && t.uri !== track.uri);
+  } else {
+    // Fallback: just filter by id
+    state.queue = state.queue.filter(t => t.id !== id);
   }
   renderQueue();
   updateStats();
