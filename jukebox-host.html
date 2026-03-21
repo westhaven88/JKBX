@@ -1695,11 +1695,23 @@ async function pollSpotifyQueue() {
     if (newQueue.length >= 15) break;
   }
 
+  // If shuffleOrder is set, re-sort newQueue to match it
+  let displayQueue = newQueue;
+  if (shuffleOrder.length > 0) {
+    const uriMap = {};
+    newQueue.forEach(t => { if (t.uri) uriMap[t.uri] = t; });
+    // Build display in shuffle order, append any new tracks at end
+    const ordered = [];
+    shuffleOrder.forEach(uri => { if (uriMap[uri]) ordered.push(uriMap[uri]); });
+    newQueue.forEach(t => { if (t.uri && !shuffleOrder.includes(t.uri)) ordered.push(t); });
+    displayQueue = ordered.length > 0 ? ordered : newQueue;
+  }
+
   // Only re-render if URIs changed
-  const newUris = newQueue.map(t => t.uri).join(',');
+  const newUris = displayQueue.map(t => t.uri).join(',');
   const oldUris = state.queue.map(t => t.uri).join(',');
   if (newUris !== oldUris) {
-    state.queue = newQueue;
+    state.queue = displayQueue;
     renderQueue();
     updateStats();
   }
@@ -1823,15 +1835,27 @@ function copyLink() {
 }
 
 // ── SHUFFLE ──────────────────────────────────────────────────────────
-let shuffleLock = false; // when true, queue poll won't overwrite display
+let shuffleLock = false;
+let shuffleOrder = []; // persists the shuffled URI order across polls
 
 async function toggleShuffle() {
+  // If already shuffled, clear it
+  if (shuffleOrder.length > 0) {
+    shuffleOrder = [];
+    shuffleLock = false;
+    const btn = document.getElementById('shuffleBtn');
+    btn.classList.remove('active');
+    btn.textContent = '⇄ Shuffle?';
+    btn.title = 'Shuffle queue';
+    lastQueuePoll = 0;
+    pollPlayback();
+    showShuffleToast('Shuffle cleared — original order restored');
+    return;
+  }
   if (state.queue.length < 2) {
     showShuffleToast('Add more songs first!');
     return;
   }
-  // Log queue URIs for debugging
-  console.log('Queue URIs:', state.queue.map(t => t.uri));
 
   const btn = document.getElementById('shuffleBtn');
   btn.textContent = '⇄ Working...';
@@ -1850,6 +1874,8 @@ async function toggleShuffle() {
   // BEST APPROACH: Add all shuffled tracks to queue — they'll play after current song
   // and the display will update to show the new order
 
+  // Store shuffled URI order persistently
+  shuffleOrder = shuffled.map(t => t.uri).filter(Boolean);
   // Update queue display immediately with shuffled order
   state.queue = shuffled;
   renderQueue();
@@ -1874,7 +1900,8 @@ async function toggleShuffle() {
   }
 
   btn.classList.add('active');
-  btn.textContent = '⇄ Shuffled!';
+  btn.textContent = '✕ Clear Shuffle';
+  btn.title = 'Click to restore original queue order';
   btn.disabled = false;
 
   if (added > 0) {
@@ -1886,7 +1913,7 @@ async function toggleShuffle() {
   }
   // Lock queue poll for 20 seconds so shuffled display stays visible
   shuffleLock = true;
-  setTimeout(() => { shuffleLock = false; lastQueuePoll = 0; }, 30000);
+  setTimeout(() => { shuffleLock = false; lastQueuePoll = 0; }, 30000); // shuffleOrder persists
 
   // Refresh queue display after a moment
   setTimeout(() => {
