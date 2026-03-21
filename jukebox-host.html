@@ -1875,10 +1875,14 @@ async function toggleShuffle() {
 
   if (added > 0) {
     showShuffleToast('🎲 Shuffled! ' + added + ' songs re-queued');
+    // Pause queue polling for 15s so shuffled display stays visible
+    // Spotify needs time to process the new queue order anyway
+    lastQueuePoll = Date.now() + 15000;
   } else if (skipped === shuffled.length) {
     showShuffleToast('⚠️ No Spotify URIs found in queue — try re-adding songs');
   } else {
     showShuffleToast('Display order shuffled ✓');
+    lastQueuePoll = Date.now() + 15000;
   }
 
   // Refresh queue display after a moment
