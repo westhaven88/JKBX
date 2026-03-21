@@ -1821,42 +1821,70 @@ function copyLink() {
 }
 
 // ── SHUFFLE ──────────────────────────────────────────────────────────
-let shuffleActive = false;
-
 async function toggleShuffle() {
-  shuffleActive = !shuffleActive;
-  const btn = document.getElementById('shuffleBtn');
-
-  // Tell Spotify to enable/disable shuffle
-  await spotifyFetch(`/me/player/shuffle?state=${shuffleActive}`, 'PUT');
-
-  if (shuffleActive) {
-    btn.classList.add('active');
-    btn.textContent = '⇄ ON';
-    btn.title = 'Shuffle is ON — click to turn off';
-  } else {
-    btn.classList.remove('active');
-    btn.textContent = '⇄ SHUFFLE';
-    btn.title = 'Shuffle queue';
+  if (state.queue.length < 2) {
+    showShuffleToast('Add more songs first!');
+    return;
   }
 
-  // Force queue refresh to show new order
-  setTimeout(() => { lastQueuePoll = 0; pollPlayback(); }, 600);
+  const btn = document.getElementById('shuffleBtn');
+  btn.textContent = '⇄ ...';
+  btn.disabled = true;
+
+  // Fisher-Yates shuffle of current queue
+  const shuffled = [...state.queue];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+
+  // Clear Spotify's queue by skipping isn't possible via API
+  // Instead: re-add all tracks in new shuffled order
+  // First skip to empty the current queue isn't reliable either
+  // BEST APPROACH: Add all shuffled tracks to queue — they'll play after current song
+  // and the display will update to show the new order
+
+  let added = 0;
+  for (const track of shuffled) {
+    if (track.uri) {
+      const res = await spotifyFetch(`/me/player/queue?uri=${encodeURIComponent(track.uri)}`, 'POST');
+      if (res !== null) added++;
+      await new Promise(r => setTimeout(r, 100)); // small delay between calls
+    }
+  }
+
+  btn.classList.add('active');
+  btn.textContent = '⇄ SHUFFLED';
+  btn.disabled = false;
+  showShuffleToast(`Queue shuffled! (${added} songs re-queued)`);
+
+  // Refresh queue display after a moment
+  setTimeout(() => {
+    lastQueuePoll = 0;
+    pollPlayback();
+    setTimeout(() => {
+      btn.textContent = '⇄ SHUFFLE';
+      btn.classList.remove('active');
+    }, 3000);
+  }, 1500);
 }
 
-// Sync shuffle state from Spotify on playback poll
-function syncShuffleState(isShuffled) {
-  shuffleActive = isShuffled;
-  const btn = document.getElementById('shuffleBtn');
-  if (!btn) return;
-  if (isShuffled) {
-    btn.classList.add('active');
-    btn.textContent = '⇄ ON';
-  } else {
-    btn.classList.remove('active');
-    btn.textContent = '⇄ SHUFFLE';
+function showShuffleToast(msg) {
+  let toast = document.getElementById('shuffleToast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'shuffleToast';
+    toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid var(--amber);color:var(--amber);font-family:"DM Mono",monospace;font-size:0.78rem;padding:12px 24px;border-radius:6px;z-index:500;white-space:nowrap;transition:opacity 0.3s;';
+    document.body.appendChild(toast);
   }
+  toast.textContent = msg;
+  toast.style.opacity = '1';
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => { toast.style.opacity = '0'; }, 3000);
 }
+
+// Keep syncShuffleState as no-op (we handle shuffle ourselves)
+function syncShuffleState(isShuffled) {}
 
 // ── UTILS ────────────────────────────────────────────────────────────
 function escHtml(str) {
